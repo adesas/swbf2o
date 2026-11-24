@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SWBF2 Phase 5 Interactive Input + 3D SoundFL WebAudio Check</title>
+<style>
+  html, body { margin: 0; background: #000; color: #ddd; font: 12px monospace; }
+  canvas { display: block; width: 800px; height: 600px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="600" tabindex="0"></canvas>
+<script type="module">
+import { InputBridgeWriter, createInputBuffer } from '/browser/input_bridge.mjs';
+import { WebAudioSabSink, AUDIO_SAB_DEFAULT_FRAMES } from '/browser/webaudio.mjs';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const canvas = document.getElementById('c');
+const W = 800, H = 600;
+
+function rgbaToPngDataUrl(buffer, w, h) {
+  if (!buffer) return null;
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  const ctx = tmp.getContext('2d');
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(buffer), w, h), 0, 0);
+  return tmp.toDataURL('image/png');
+}
+
+(async () => {
+  const result = { ok: false, crossOriginIsolated: self.crossOriginIsolated };
+  let worker = null;
+  let audioSink = null;
+  let inputWriter = null;
+  try {
+    audioSink = new WebAudioSabSink({ sampleRate: 48000, capacityFrames: AUDIO_SAB_DEFAULT_FRAMES });
+    await audioSink.start({ withAnalyser: true });
+
+    const inputSab = createInputBuffer();
+    inputWriter = new InputBridgeWriter({ sab: inputSab, canvas, gameWidth: W, gameHeight: H });
+    inputWriter.attach();
+
+    const offscreen = canvas.transferControlToOffscreen();
+    worker = new Worker('/browser/worker.mjs', { type: 'module' });
+    let nextId = 1;
+    const pending = new Map();
+    let latestStatus = null;
+    worker.onmessage = (ev) => {
+      const m = ev.data || {};
+      if (m.type === 'interactiveStatus') {
+        latestStatus = m;
+        return;
+      }
+      if (m.type === 'log') {
+        console.log(m.text);
+        return;
+      }
+      if (m.id && pending.has(m.id)) {
+        const { resolve, reject } = pending.get(m.id);
+        pending.delete(m.id);
+        if (m.ok) resolve(m);
+        else reject(new Error(m.error || m.stage || 'worker error'));
+      }
+    };
+    const callWorker = (cmd, opts = {}, transfers = []) => {
+      const id = nextId++;
+      return new Promise((resolve, reject) => {
+        pending.set(id, { resolve, reject });
+        worker.postMessage({ id, cmd, opts }, transfers);
+      });
+    };
+
+    const analyserBuf = new Float32Array(audioSink.analyser.fftSize);
+    let analyserPeakShell = 0, analyserNonZeroShell = 0;
+    let analyserPeakMission = 0, analyserNonZeroMission = 0;
+    const sampleAnalyser = (phase) => {
+      audioSink.analyser.getFloatTimeDomainData(analyserBuf);
+      for (let i = 0; i < analyserBuf.length; ++i) {
+        const a = Math.abs(analyserBuf[i]);
+        if (phase === 'shell') {
+          if (a > analyserPeakShell) analyserPeakShell = a;
+          if (a > 1e-5) ++analyserNonZeroShell;
+        } else {
+          if (a > analyserPeakMission) analyserPeakMission = a;
+          if (a > 1e-5) ++analyserNonZeroMission;
+        }
+      }
+    };
+
+    const startRes = await callWorker('startInteractive', {
+      canvas: offscreen,
+      width: W,
+      height: H,
+      inputSab,
+      audioSab: audioSink.sab,
+      audioCapacityFrames: audioSink.capacityFrames,
+    }, [offscreen]);
+    result.wgpuReady = startRes.wgpuReady;
+
+    // 1. Let Shell run ~1.2 s so shell music & UI settle; sample live WebAudio AudioWorklet output.
+    for (let i = 0; i < 24; ++i) {
+      await sleep(50);
+      sampleAnalyser('shell');
+    }
+    const shellSnap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    result.shellSnapshot = shellSnap;
+    result.shellAudioSink = audioSink.getStats();
+    result.analyserShell = { peak: +analyserPeakShell.toFixed(4), nonZero: analyserNonZeroShell };
+    console.log(`[phase5] shell screen=${shellSnap.status.currentScreen} mixCfg=${shellSnap.audioStats.mixConfig} bufs=${shellSnap.audioStats.totalBuffersCreated} playing=${shellSnap.audioStats.peakPlayingBuffers} rms=${shellSnap.audioStats.overallRmsL}/${shellSnap.audioStats.overallRmsR} workletFrames=${result.shellAudioSink.totalFramesRead} analyserPeak=${result.analyserShell.peak}`);
+
+    // 2. Drive ifs_login -> ifs_sp_campaign via REAL DOM KeyboardEvent on window -> SharedArrayBuffer!
+    const tapDomKey = async (code, holdMs = 120, waitMs = 450) => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true }));
+      await sleep(holdMs);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true, cancelable: true }));
+      await sleep(waitMs);
+    };
+    const isMenu = (sc) => sc === 'ifs_sp_campaign' || sc === 'ifs_main';
+    await tapDomKey('Enter', 120, 600);
+    let afterLoginSnap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    for (let retry = 0; retry < 6 && !isMenu(afterLoginSnap.status.currentScreen); ++retry) {
+      await sleep(300);
+      afterLoginSnap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+      if (retry === 2 && !isMenu(afterLoginSnap.status.currentScreen)) {
+        await tapDomKey('Enter', 120, 500);
+        afterLoginSnap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+      }
+    }
+    result.afterLoginScreen = afterLoginSnap.status.currentScreen;
+    console.log(`[phase5] after DOM Enter login screen=${result.afterLoginScreen}`);
+
+    // 3. Launch Mos Eisley Conquest (tat2g_con) and spawn using REAL DOM MouseEvents on canvas!
+    const clickCanvasAt = async (gx, gy, holdMs = 100, waitMs = 400) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = rect.left + (gx / W) * rect.width;
+      const clientY = rect.top + (gy / H) * rect.height;
+      canvas.dispatchEvent(new MouseEvent('mousemove', { clientX, clientY, bubbles: true }));
+      await sleep(80);
+      canvas.dispatchEvent(new MouseEvent('mousedown', { clientX, clientY, button: 0, buttons: 1, bubbles: true }));
+      await sleep(holdMs);
+      window.dispatchEvent(new MouseEvent('mouseup', { clientX, clientY, button: 0, buttons: 0, bubbles: true }));
+      await sleep(waitMs);
+    };
+
+    await callWorker('interactiveAction', { action: 'launchMission', script: 'tat2g_con' });
+    let snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    for (let i = 0; i < 40 && snap.status.state !== 'mission'; ++i) {
+      await sleep(150);
+      snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    }
+    // Wait for ifs_sideselect1 or spawnMode >= 0
+    for (let i = 0; i < 30 && snap.status.spawnMode < 0 && !snap.status.playerAlive; ++i) {
+      await sleep(150);
+      snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    }
+    if (snap.status.spawnMode === 0 || snap.status.currentScreen === 'ifs_sideselect1') {
+      const tx = (snap.status.sideTeam1X >= 0 ? snap.status.sideTeam1X : 540) + 40;
+      const ty = (snap.status.sideTeam1Y >= 0 ? snap.status.sideTeam1Y : 292) + 2;
+      await clickCanvasAt(tx, ty, 100, 450);
+      snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    }
+    for (let retry = 0; retry < 12 && !snap.status.playerAlive; ++retry) {
+      if (snap.status.spawnMode === 2 && snap.status.spawnAcceptX >= 0) {
+        await clickCanvasAt(snap.status.spawnAcceptX, snap.status.spawnAcceptY, 100, 450);
+      } else {
+        await sleep(250);
+      }
+      snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    }
+    await sleep(300);
+    await callWorker('interactiveAction', { action: 'resetAudioMetrics' });
+    const spawnSnap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    result.spawnSnapshot = spawnSnap;
+    console.log(`[phase5] tat2g_con spawned alive=${spawnSnap.status.playerAlive} ptrLockWanted=${spawnSnap.status.pointerLockWanted} pos=(${spawnSnap.status.playerX},${spawnSnap.status.playerY},${spawnSnap.status.playerZ}) fwd=(${spawnSnap.status.playerFwdX},${spawnSnap.status.playerFwdZ}) clip=${spawnSnap.status.playerClip}`);
+
+    // 4. Drive live 3D gameplay via REAL DOM WASD + PointerLock mouse delta + Left-Click fire!
+    //    4a. Hold KeyW (forward) for 750ms
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true, cancelable: true }));
+    for (let i = 0; i < 15; ++i) {
+      await sleep(50);
+      sampleAnalyser('mission');
+    }
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true, cancelable: true }));
+    await sleep(100);
+    const afterMoveSnap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    const dxMove = afterMoveSnap.status.playerX - spawnSnap.status.playerX;
+    const dzMove = afterMoveSnap.status.playerZ - spawnSnap.status.playerZ;
+    result.wasdDistanceMoved = +Math.hypot(dxMove, dzMove).toFixed(3);
+
+    //    4b. Rotate view with relative mouse movementX (PointerLock deltas)
+    const beforeLookFwdX = afterMoveSnap.status.playerFwdX;
+    const beforeLookFwdZ = afterMoveSnap.status.playerFwdZ;
+    for (let i = 0; i < 12; ++i) {
+      canvas.dispatchEvent(new MouseEvent('mousemove', { movementX: 28, movementY: 0, bubbles: true }));
+      await sleep(40);
+      sampleAnalyser('mission');
+    }
+    await sleep(100);
+    const afterLookSnap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    const dot = Math.max(-1, Math.min(1,
+      beforeLookFwdX * afterLookSnap.status.playerFwdX + beforeLookFwdZ * afterLookSnap.status.playerFwdZ));
+    result.mouseLookAngleDeg = +(Math.acos(dot) * 180 / Math.PI).toFixed(2);
+
+    //    4c. Fire blaster with REAL DOM MouseEvent left click (triggers blaster ordnance + 3D fire SFX!)
+    const clipBefore = afterLookSnap.status.playerClip;
+    const fireTimeBefore = afterLookSnap.status.playerLastFireTime;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { button: 0, buttons: 1, bubbles: true }));
+    for (let i = 0; i < 12; ++i) {
+      await sleep(50);
+      sampleAnalyser('mission');
+    }
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 0, buttons: 0, bubbles: true }));
+    await sleep(250);
+    sampleAnalyser('mission');
+    const afterFireSnap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    result.fireCheck = {
+      clipBefore,
+      clipAfter: afterFireSnap.status.playerClip,
+      fireTimeBefore,
+      fireTimeAfter: afterFireSnap.status.playerLastFireTime,
+      fired: (afterFireSnap.status.playerClip < clipBefore) || (afterFireSnap.status.playerLastFireTime > fireTimeBefore),
+    };
+
+    //    4d. Exercise Gamepad SharedArrayBuffer path (left stick + right stick + button A)
+    inputWriter.setSyntheticGamepad({ connected: true, lx: 0.85, ly: -0.6, rx: -0.75, ry: 0, buttons: 1, pov: 0 });
+    for (let i = 0; i < 8; ++i) {
+      await sleep(50);
+      sampleAnalyser('mission');
+    }
+    inputWriter.setSyntheticGamepad({ connected: false });
+    await sleep(100);
+
+    const missionSnap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    result.missionSnapshot = missionSnap;
+    result.missionAudioSink = audioSink.getStats();
+    result.analyserMission = { peak: +analyserPeakMission.toFixed(4), nonZero: analyserNonZeroMission };
+    console.log(`[phase5] mission move=${result.wasdDistanceMoved}m look=${result.mouseLookAngleDeg}deg fired=${result.fireCheck.fired} audioRms=${missionSnap.audioStats.overallRmsL}/${missionSnap.audioStats.overallRmsR} peak=${missionSnap.audioStats.maxPeak} stereoDiff=${missionSnap.stereoMeanDiff} workletFrames=${result.missionAudioSink.totalFramesRead} analyserPeak=${result.analyserMission.peak}`);
+
+    const rb = await callWorker('interactiveAction', { action: 'readbackFrame' });
+    result.frameMission = rb.meta;
+    window.__phase5PngLive = rgbaToPngDataUrl(rb.pixels, rb.width, rb.height);
+
+    // 5. Clean teardown: return to Shell and stop interactive loop with 0 errors.
+    await callWorker('interactiveAction', { action: 'returnToShell' });
+    for (let i = 0; i < 20; ++i) {
+      await sleep(100);
+      const s = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+      if (s.status.state === 'shell') { result.returnToShell = s.status; break; }
+    }
+    await callWorker('stopInteractive', { closeHandlesOnExit: true });
+    inputWriter.detach();
+    await audioSink.stop();
+    result.ok = true;
+  } catch (err) {
+    result.error = String(err && err.stack ? err.stack : err);
+    console.error('[phase5] error:', result.error);
+  } finally {
+    try { inputWriter?.detach(); } catch {}
+    try { await audioSink?.stop(); } catch {}
+    try { worker?.terminate(); } catch {}
+  }
+  window.__phase5Result = result;
+})();
+</script>
+</body>
+</html>

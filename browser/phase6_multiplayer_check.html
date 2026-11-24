@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SWBF2 Phase 6 Multiplayer Tab Harness</title>
+<style>
+  html, body { margin: 0; background: #000; color: #ddd; font: 12px monospace; }
+  canvas { display: block; width: 800px; height: 600px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="600" tabindex="0"></canvas>
+<script type="module">
+import { InputBridgeWriter, createInputBuffer } from '/browser/input_bridge.mjs';
+import { BrowserNetClient } from '/browser/net_client.mjs';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const canvas = document.getElementById('c');
+const W = 800, H = 600;
+const params = new URLSearchParams(location.search);
+const role = params.get('role') || 'client';
+const room = params.get('room') || 'phase6_room';
+const wsUrl = params.get('ws') || 'ws://127.0.0.1:8133';
+const playerName = params.get('name') || (role === 'host' ? 'HostTrooper' : 'ClientTrooper');
+
+let worker = null;
+let netClient = null;
+let inputWriter = null;
+let nextId = 1;
+const pending = new Map();
+
+function callWorker(cmd, opts = {}, transfers = []) {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    worker.postMessage({ id, cmd, opts }, transfers);
+  });
+}
+
+function rgbaToPngDataUrl(buffer, w, h) {
+  if (!buffer) return null;
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  const ctx = tmp.getContext('2d');
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(buffer), w, h), 0, 0);
+  return tmp.toDataURL('image/png');
+}
+
+async function tapDomKey(code, holdMs = 120, waitMs = 400) {
+  window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true }));
+  await sleep(holdMs);
+  window.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true, cancelable: true }));
+  await sleep(waitMs);
+}
+
+async function clickCanvasAt(gx, gy, holdMs = 100, waitMs = 350) {
+  const rect = canvas.getBoundingClientRect();
+  const clientX = rect.left + (gx / W) * rect.width;
+  const clientY = rect.top + (gy / H) * rect.height;
+  canvas.dispatchEvent(new MouseEvent('mousemove', { clientX, clientY, bubbles: true }));
+  await sleep(60);
+  canvas.dispatchEvent(new MouseEvent('mousedown', { clientX, clientY, button: 0, buttons: 1, bubbles: true }));
+  await sleep(holdMs);
+  window.dispatchEvent(new MouseEvent('mouseup', { clientX, clientY, button: 0, buttons: 0, bubbles: true }));
+  await sleep(waitMs);
+}
+
+window.__mpApi = {
+  async boot() {
+    netClient = new BrowserNetClient({
+      serverUrl: wsUrl,
+      room,
+      role,
+      name: playerName,
+      map: 'tat2g_con',
+      enableWebRtc: true,
+    });
+    const welcome = await netClient.connect();
+
+    const inputSab = createInputBuffer();
+    inputWriter = new InputBridgeWriter({ sab: inputSab, canvas, gameWidth: W, gameHeight: H });
+    inputWriter.attach();
+
+    const offscreen = canvas.transferControlToOffscreen();
+    worker = new Worker('/browser/worker.mjs', { type: 'module' });
+    worker.onmessage = (ev) => {
+      const m = ev.data || {};
+      if (m.type === 'log') {
+        console.log(`[${role}] ${m.text}`);
+        return;
+      }
+      if (m.id && pending.has(m.id)) {
+        const { resolve, reject } = pending.get(m.id);
+        pending.delete(m.id);
+        if (m.ok) resolve(m);
+        else reject(new Error(m.error || m.stage || 'worker error'));
+      }
+    };
+
+    const startRes = await callWorker('startInteractive', {
+      canvas: offscreen,
+      width: W,
+      height: H,
+      audioEnabled: false, // keep 2-tab headless check focused on WebGPU + networking
+      inputSab,
+      netTxSab: netClient.txSab,
+      netRxSab: netClient.rxSab,
+      localIpInt: welcome.ipInt,
+    }, [offscreen]);
+
+    // Log past ifs_login via real DOM Enter so PlayerProfile is active before entering LAN lobby.
+    await sleep(600);
+    for (let i = 0; i < 4; ++i) {
+      const snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+      if (snap.status.currentScreen === 'ifs_sp_campaign' || snap.status.currentScreen === 'ifs_main') break;
+      await tapDomKey('Enter', 120, 500);
+    }
+
+    return {
+      welcome,
+      wgpuReady: startRes.wgpuReady,
+      snapshot: (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot,
+      netClient: netClient.getStats(),
+    };
+  },
+
+  async hostLan(roomName = 'MosEisleyWeb', mission = 'tat2g_con') {
+    const res = await callWorker('interactiveAction', { action: 'hostLan', roomName, mission, playerName });
+    return { ok: res.ok, snapshot: res.snapshot, netClient: netClient.getStats() };
+  },
+
+  async findLan() {
+    const res = await callWorker('interactiveAction', { action: 'findLan', playerName });
+    return { ok: res.ok, snapshot: res.snapshot, netClient: netClient.getStats() };
+  },
+
+  async joinFound(index = 0) {
+    const res = await callWorker('interactiveAction', { action: 'joinFound', index });
+    return { ok: res.ok, snapshot: res.snapshot, netClient: netClient.getStats() };
+  },
+
+  async launchMatch() {
+    const res = await callWorker('interactiveAction', { action: 'launchMatch' });
+    return { ok: res.ok, snapshot: res.snapshot, netClient: netClient.getStats() };
+  },
+
+  async spawnLocalPlayer() {
+    let snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    for (let step = 0; step < 80 && !snap.status.playerAlive; ++step) {
+      // Host presses Spacebar to end SWBF2's native 30-second multiplayer pre-game countdown!
+      if (role === 'host' && snap.netStatus?.isPreGame) {
+        await tapDomKey('Space', 120, 350);
+        snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+      }
+      if (snap.status.spawnMode === 0 || snap.status.currentScreen === 'ifs_sideselect1') {
+        if (snap.status.sideAutoX >= 0 && snap.status.sideAutoY >= 0) {
+          await clickCanvasAt(snap.status.sideAutoX + 20, snap.status.sideAutoY + 2, 100, 400);
+        } else {
+          await tapDomKey('Enter', 120, 400);
+        }
+      } else if (snap.status.spawnMode === 2 && snap.status.spawnAcceptX >= 0) {
+        await clickCanvasAt(snap.status.spawnAcceptX, snap.status.spawnAcceptY, 100, 450);
+      } else {
+        await sleep(300);
+      }
+      snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    }
+    return { snapshot: snap, netClient: netClient.getStats() };
+  },
+
+  async moveForward(durationMs = 700) {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true, cancelable: true }));
+    await sleep(durationMs);
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true, cancelable: true }));
+    await sleep(200);
+    return { snapshot: (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot, netClient: netClient.getStats() };
+  },
+
+  async getSnapshot() {
+    const snap = (await callWorker('interactiveAction', { action: 'getSnapshot' })).snapshot;
+    return { snapshot: snap, netClient: netClient ? netClient.getStats() : null };
+  },
+
+  async readbackPng() {
+    const rb = await callWorker('interactiveAction', { action: 'readbackFrame' });
+    return {
+      meta: rb.meta,
+      png: rgbaToPngDataUrl(rb.pixels, rb.width, rb.height),
+    };
+  },
+
+  async stop() {
+    try { await callWorker('stopInteractive', { closeHandlesOnExit: true }); } catch {}
+    try { inputWriter?.detach(); } catch {}
+    try { netClient?.close(); } catch {}
+    try { worker?.terminate(); } catch {}
+    return { ok: true };
+  },
+};
+
+window.__mpReady = true;
+</script>
+</body>
+</html>

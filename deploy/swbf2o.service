@@ -1,0 +1,23 @@
+# Systemd unit to keep SWBF2O (serve.py + multiplayer_server.mjs) running 24/7 across reboots.
+# Runs in Bring-Your-Own-Copy (BYOC) mode by default (zero copyrighted game assets hosted).
+# Install with:
+#   sudo cp /opt/swbf2-web/deploy/swbf2o.service /etc/systemd/system/swbf2o.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now swbf2o
+
+[Unit]
+Description=SWBF2O WebGPU & WebRTC Multiplayer Server (swbf2o.com)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=swbf2
+WorkingDirectory=/opt/swbf2-web
+ExecStart=/usr/bin/python3 /opt/swbf2-web/tools/serve.py 8123 --host 0.0.0.0 --tls-port 8443 --mp-port 8133
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>swbf2-browser — engine runtime on real GameData</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --ink:#e8eef6; --dim:#8ea4bd; --bg:#07090d; --line:#1b2836; --hi:#f2c14e; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font:13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  #wrap { display:grid; grid-template-columns: 1fr 430px; height:100%; }
+  #stage { position:relative; display:flex; align-items:center; justify-content:center;
+    border-right:1px solid var(--line); overflow:hidden; }
+  canvas { width:100%; height:100%; display:block; image-rendering:auto; background:#000; }
+  #hud { position:absolute; left:14px; top:12px; right:14px; display:flex; gap:14px;
+    pointer-events:none; text-shadow:0 1px 3px #000; }
+  #hud b { color:var(--hi); font-weight:600; }
+  #caption { position:absolute; left:14px; bottom:12px; right:14px; pointer-events:none;
+    text-shadow:0 1px 3px #000; color:var(--dim); }
+  /* The combat HUD is browser chrome, not an engine font texture. It stays hidden until the
+     engine reports a live player; the host fills it from the simulation's own state. */
+  #reticle { position:absolute; left:50%; top:50%; width:18px; height:18px;
+    transform:translate(-50%,-50%); pointer-events:none; display:none; }
+  #reticle::before, #reticle::after { content:""; position:absolute; background:#e8eef6;
+    box-shadow:0 0 2px #000; transition:background 0.1s, box-shadow 0.1s; }
+  #reticle::before { left:8px; top:1px; width:2px; height:16px; }
+  #reticle::after { left:1px; top:8px; width:16px; height:2px; }
+  #reticle.hit::before, #reticle.hit::after { background:#ff3b30; box-shadow:0 0 8px #ff3b30; }
+  #combatHud { position:absolute; right:18px; bottom:18px; min-width:180px; text-align:right;
+    pointer-events:none; display:none; text-shadow:0 1px 3px #000; font-family:monospace,sans-serif; }
+  .health-container { display:flex; flex-direction:column; align-items:flex-end; margin-bottom:4px; }
+  .health-label { font-size:10px; color:var(--dim); letter-spacing:.08em; }
+  .health-bar { width:150px; height:7px; background:#0b1522; border:1px solid #1a3c5e; border-radius:2px;
+    overflow:hidden; margin:2px 0; }
+  .health-fill { width:100%; height:100%; background:linear-gradient(90deg,#0088cc,#2ac4ff);
+    box-shadow:0 0 6px #2ac4ff; transition:width 0.1s linear; }
+  .health-val { font-size:18px; color:#d8f0ff; }
+  .health-val b { font-weight:700; color:#5cd6ff; }
+  .ammo-container { display:flex; flex-direction:column; align-items:flex-end; margin:4px 0; }
+  .ammo { font-size:22px; color:var(--hi); font-weight:700; }
+  .weapon { color:#b0cce8; font-size:12px; letter-spacing:.04em; }
+  .targets { margin-top:6px; color:#ff9f43; font-size:12px; }
+  .targets b { color:#ffd32a; }
+  #bannerOverlay { position:absolute; left:50%; top:38%; transform:translate(-50%,-50%);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    pointer-events:none; z-index:100; text-align:center; }
+  .banner-title { font-size:38px; font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
+  .banner-sub { font-size:14px; color:#f1f2f6; margin-top:6px; text-shadow:0 1px 5px #000; }
+  #bannerOverlay.victory .banner-title { color:#ffd32a; text-shadow:0 0 20px #ff9f43; }
+  #bannerOverlay.defeated .banner-title { color:#ff3838; text-shadow:0 0 20px #c51162; }
+  #panel { display:flex; flex-direction:column; min-height:0; }
+  header { padding:14px 16px 10px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0 0 4px; font-size:15px; letter-spacing:.02em; }
+  header p { margin:0; color:var(--dim); font-size:12px; }
+  #body { overflow:auto; padding:12px 16px; flex:1; min-height:0; }
+  h2 { font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--dim);
+    margin:16px 0 8px; }
+  h2:first-child { margin-top:0; }
+  button { font:inherit; background:#101722; color:var(--ink); border:1px solid #24384d;
+    border-radius:5px; padding:5px 9px; margin:2px 3px 2px 0; cursor:pointer; }
+  button:hover { border-color:var(--hi); color:var(--hi); }
+  button.primary { border-color:#4d3f16; background:#1a1408; color:var(--hi); }
+  #files { max-height:190px; overflow:auto; border:1px solid var(--line); border-radius:5px;
+    padding:6px; }
+  #files .row { display:flex; justify-content:space-between; gap:8px; padding:2px 4px;
+    cursor:pointer; border-radius:3px; }
+  #files .row:hover { background:#101a26; color:var(--hi); }
+  #files .row .sz { color:var(--dim); }
+  #log { white-space:pre-wrap; word-break:break-word; color:#b9c9dc; font-size:12px; }
+  #log .e { color:#ff8a7a; }
+  #log .w { color:var(--hi); }
+  .bar { height:6px; background:#0e1520; border-radius:3px; overflow:hidden; margin:6px 0; }
+  .bar > div { height:100%; width:0; background:linear-gradient(90deg,#2d6cdf,var(--hi)); }
+  .stat { display:grid; grid-template-columns:1fr auto; gap:2px 10px; }
+  .stat span:nth-child(odd) { color:var(--dim); }
+  kbd { background:#101722; border:1px solid #24384d; border-radius:3px; padding:0 4px; }
+  a { color:#66aaff; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="canvas"></canvas>
+    <div id="hud">
+      <span>swbf2 <b id="hFrames">0</b> frames</span>
+      <span>sim <b id="hSim">0.0</b>s</span>
+      <span id="hClock"></span>
+      <span><b id="hFps">0</b> fps</span>
+      <span>Lua <b id="hLua">0</b></span>
+      <span id="hTex"></span>
+      <span>gpu <b id="hGpu">—</b></span>
+    </div>
+    <div id="reticle"></div>
+    <div id="combatHud">
+      <div class="health-container">
+        <div class="health-label">HEALTH</div>
+        <div class="health-bar"><div id="hHealthBar" class="health-fill"></div></div>
+        <div class="health-val"><b id="hHealth">400</b> / 400</div>
+      </div>
+      <div class="ammo-container">
+        <div class="ammo-label">AMMO</div>
+        <div class="ammo" id="hAmmo">—</div>
+      </div>
+      <div class="weapon" id="hWeapon">E-11 Blaster Rifle</div>
+      <div class="targets" id="hTargetsRow">Droids: <b id="hTargets">4 / 4</b></div>
+    </div>
+    <div id="bannerOverlay"></div>
+    <div id="caption">loading engine…</div>
+  </div>
+
+  <div id="panel">
+    <header>
+      <h1>Star Wars Battlefront II — browser runtime</h1>
+      <p id="ver">compiling wasm…</p>
+    </header>
+    <div id="body">
+      <h2>engine status</h2>
+      <div class="stat" id="status">
+        <span>wasm module</span><span>—</span>
+        <span>engine TUs linked</span><span>—</span>
+        <span>WebGL / S3TC</span><span>—</span>
+      </div>
+      <div class="bar"><div id="progress"></div></div>
+      <div id="note"></div>
+
+      <h2>game data</h2>
+      <div id="files">loading file list…</div>
+
+      <h2>actions</h2>
+      <a href="/browser/play.html" style="display:inline-block;margin:0 0 8px;padding:6px 12px;border:1px solid var(--hi);border-radius:5px;background:#1d1709;color:var(--hi);text-decoration:none;font-weight:700;">▶ Launch Full Game (WebGPU + OPFS + 3D WebAudio)</a><br>
+      <button id="btnProbe" class="primary">walk chunks (engine PblChunk)</button>
+      <button id="btnMontage" class="primary">montage: many textures at once</button>
+      <button id="btn3D" class="primary">3D view (engine camera)</button>
+      <button id="btnFlat">flat view</button>
+      <button id="btnSingle">single view</button>
+      <button id="btnTex">next texture</button>
+      <button id="btnLua">run scripts (LuaFL 5.0)</button>
+      <button id="btnPrev">‹</button><button id="btnNext">›</button>
+
+      <h2>engine log</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+<script src="build/browser/swbf2.js"></script>
+<script src="browser/host.js"></script>
+</body>
+</html>

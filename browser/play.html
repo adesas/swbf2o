@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SWBF2O — Play in Browser</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Play Star Wars Battlefront II (2005) natively in your browser with WebGPU and WebRTC multiplayer.">
+<link rel="icon" type="image/svg+xml" href="/browser/favicon.svg">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #03060c;
+    --card: rgba(9, 15, 24, 0.90);
+    --card-border: #5a6878;
+    --ink: #eaf2fa;
+    --dim: #9ab0c6;
+    --gold: #e8b84b;
+    --gold-glow: rgba(232, 184, 75, 0.35);
+    --cyan: #66c4ff;
+    --ok: #46d97e;
+    --warn: #f0a83e;
+    --err: #ff6b6b;
+    --font-display: "Eurostile", "Bank Gothic", "Microgramma", "Bahnschrift", "DIN Condensed", "Arial Narrow", "Trebuchet MS", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; width: 100%; height: 100%; height: 100dvh; overflow: hidden;
+    background: #02050a;
+    color: var(--ink);
+    font: 14px/1.45 "Tahoma", "Verdana", "Segoe UI", Arial, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    overscroll-behavior: none;
+  }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  #stage {
+    position: relative; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: none;
+  }
+  canvas {
+    width: 100%; height: 100%; object-fit: contain;
+    display: block; background: #000; outline: none;
+    touch-action: none;
+  }
+
+  /* ---- Subtle Top-Right In-Game Controls & Multiplayer Match Bar (F2 toggles diagnostics) ---- */
+  #hudBar {
+    position: absolute; left: 14px; top: 12px; right: 14px; z-index: 15;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    pointer-events: none; transition: opacity 0.2s;
+  }
+  #hudBar.hidden { opacity: 0; pointer-events: none !important; }
+  .pill {
+    pointer-events: auto; display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(6, 11, 20, 0.84); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px;
+    padding: 5px 11px; font-size: 12px; text-shadow: 0 1px 2px #000;
+  }
+  .pill.diag { display: none; }
+  #hudBar.show-diag .pill.diag { display: inline-flex; }
+  .pill b { color: var(--gold); font-weight: 600; }
+  .meter { width: 42px; height: 6px; background: #0d1726; border-radius: 3px; overflow: hidden; }
+  .meter > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--cyan), var(--gold)); }
+  #barActions {
+    margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px;
+    pointer-events: auto;
+  }
+  #stage:fullscreen #btnMute,
+  #stage:fullscreen #btnDrawer,
+  #stage:fullscreen #btnFs,
+  #stage:-webkit-full-screen #btnMute,
+  #stage:-webkit-full-screen #btnDrawer,
+  #stage:-webkit-full-screen #btnFs,
+  #stage.is-fullscreen #btnMute,
+  #stage.is-fullscreen #btnDrawer,
+  #stage.is-fullscreen #btnFs {
+    display: none !important;
+  }
+  @media (display-mode: fullscreen) {
+    #btnMute, #btnDrawer, #btnFs {
+      display: none !important;
+    }
+  }
+
+  button, select, input {
+    font: inherit; color: var(--ink);
+    background: rgba(8, 14, 22, 0.92);
+    border: 1px solid #4c5b6d;
+    border-radius: 3px; padding: 7px 12px;
+  }
+  input[type="checkbox"] {
+    width: 15px; height: 15px; padding: 0; accent-color: var(--cyan); cursor: pointer;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 2px rgba(102, 196, 255, 0.22);
+  }
+  button {
+    cursor: pointer; transition: all 0.13s ease;
+    font-family: var(--font-display);
+    letter-spacing: 0.06em;
+    background: linear-gradient(180deg, #435060 0%, #2a3542 50%, #1d2530 52%, #2f3b4a 100%);
+    border: 1px solid #6b7b8e;
+    box-shadow: inset 0 1px 0 rgba(220, 236, 252, 0.32), 0 2px 6px rgba(0, 0, 0, 0.65);
+  }
+  button:hover:not(:disabled) {
+    border-color: #96d2ff;
+    background: linear-gradient(180deg, #6ab2e8 0%, #3879b0 50%, #22537f 52%, #4489c3 100%);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 0 14px rgba(82, 178, 255, 0.45);
+  }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary {
+    background: linear-gradient(180deg, #7bc0f2 0%, #3d82bd 48%, #235888 52%, #4991cd 100%);
+    border: 2px solid #95d2ff; color: #ffffff; font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.72), 0 0 16px rgba(72, 168, 255, 0.40), 0 3px 10px rgba(0, 0, 0, 0.78);
+  }
+  button.primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #9dd5ff 0%, #5098d6 48%, #2c6ca6 52%, #5ca8e5 100%);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.85), 0 0 22px rgba(102, 196, 255, 0.65);
+    color: #ffffff;
+  }
+  button.secondary {
+    background: linear-gradient(180deg, #96a4b3 0%, #717e8d 48%, #535f6d 52%, #717e8d 100%);
+    border: 2px solid #1d242e;
+    color: #0b1118; font-weight: 700;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.62), 0 2px 8px rgba(0, 0, 0, 0.72);
+  }
+  button.secondary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #86c8fa 0%, #4389c6 48%, #255b8d 52%, #4a96d4 100%);
+    border-color: #9dd8ff;
+    color: #fff;
+    text-shadow: 0 1px 2px #000;
+  }
+  button.accent { border-color: #66c4ff; color: #bfe8ff; }
+  button.accent:hover:not(:disabled) { border-color: #a8e0ff; color: #fff; }
+  button.danger { border-color: rgba(235, 86, 76, 0.75); color: #ffaaa5; background: linear-gradient(180deg, #5e2422 0%, #3d1514 52%, #4e1b19 100%); }
+  button.danger:hover:not(:disabled) { background: linear-gradient(180deg, #c93b34 0%, #8f221c 52%, #b5322b 100%); border-color: #ff9c96; color: #fff; }
+
+  /* ---- Classic 2005 SWBF2 Imperial Star Destroyer Space Portal Overlay ---- */
+  #launcher {
+    position: absolute; inset: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    background:
+      repeating-linear-gradient(0deg, rgba(120, 195, 255, 0.032) 0px, rgba(120, 195, 255, 0.032) 1px, transparent 1px, transparent 3px),
+      linear-gradient(180deg, rgba(3, 6, 12, 0.62) 0%, rgba(3, 6, 12, 0.38) 45%, rgba(3, 6, 12, 0.74) 100%),
+      url('/browser/assets/bg_galactic_conquest.webp') center center / cover no-repeat;
+    overflow: auto;
+  }
+  #launcherCard {
+    width: 100%; max-width: 472px; max-height: calc(100vh - 36px); overflow-y: auto;
+    background: var(--card);
+    backdrop-filter: blur(8px);
+    border: 2px solid #5f6f81;
+    outline: 1px solid #070b11;
+    border-radius: 4px;
+    padding: 26px 26px 20px;
+    box-shadow:
+      inset 0 1px 0 rgba(215, 232, 248, 0.42),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.85),
+      0 26px 76px rgba(0, 0, 0, 0.88);
+    transition: max-width 0.22s ease;
+  }
+  #launcherCard.wide { max-width: 840px; padding: 22px 24px 18px; }
+  #launcherCard.creator { max-width: 890px; padding: 22px 24px 18px; }
+
+  .brand {
+    text-align: center;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(125, 160, 195, 0.30);
+  }
+  #launcherCard.wide .brand, #launcherCard.creator .brand { margin-bottom: 12px; padding-bottom: 10px; }
+  .brand-kicker {
+    display: inline-block;
+    font-family: var(--font-display);
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.28em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 3px;
+    text-shadow: 0 1px 2px #000;
+  }
+  .brand h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 30px; font-weight: 900; letter-spacing: 0.10em; text-transform: uppercase;
+    background: linear-gradient(180deg, #ffffff 0%, #d2e4f7 52%, #7d96b0 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.92));
+  }
+  #launcherCard.wide .brand h1, #launcherCard.creator .brand h1 { font-size: 22px; }
+  .brand-sub { margin: 4px 0 0; font-size: 12px; color: var(--cyan); letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--font-display); }
+  #launcherCard.wide .brand-sub, #launcherCard.creator .brand-sub { display: none; }
+
+  /* ---- Invite Banner ---- */
+  #inviteBanner {
+    display: none; margin-bottom: 16px; padding: 12px 14px; border-radius: 3px;
+    background: rgba(34, 83, 127, 0.28); border: 1px solid #66c4ff;
+    text-align: center;
+  }
+  #inviteBanner .inv-title { font-weight: 700; color: #fff; margin-bottom: 8px; }
+
+  /* ---- Username Field ---- */
+  .user-field { margin-bottom: 16px; }
+  .user-field label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-display);
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--cyan); margin-bottom: 6px;
+  }
+  .user-field label span.hint {
+    text-transform: none; letter-spacing: 0; font-weight: 400; font-family: var(--font-body); color: rgba(154, 176, 198, 0.78);
+  }
+  .user-field input {
+    width: 100%; padding: 10px 12px; font-size: 15px; font-weight: 700;
+    background: rgba(4, 8, 14, 0.88); border: 1px solid #59697b;
+    border-radius: 3px; color: #fff;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.75);
+  }
+
+  /* ---- Bring-Your-Own-Copy (BYOC) Local GameData Card ---- */
+  .byoc-card {
+    display: none;
+    background: rgba(6, 11, 19, 0.88);
+    border: 1px solid #7d6833;
+    border-left: 3px solid var(--gold);
+    border-radius: 3px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .byoc-card.visible { display: block; }
+  .byoc-card.ready {
+    border-color: #2f7d52;
+    border-left: 3px solid var(--ok);
+    background: rgba(7, 20, 16, 0.84);
+  }
+  .byoc-card.attention {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(232, 184, 75, 0.28);
+  }
+  .byoc-top {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .byoc-title {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gold); display: flex; align-items: center; gap: 7px;
+  }
+  .byoc-card.ready .byoc-title { color: var(--ok); }
+  .byoc-status { font-size: 12px; color: var(--dim); line-height: 1.45; margin-bottom: 10px; }
+  .byoc-status strong { color: #fff; }
+  .byoc-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .byoc-store-links {
+    margin-top: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    font-size: 11px; color: var(--dim);
+  }
+  .byoc-store-links a {
+    color: var(--cyan); text-decoration: underline; font-weight: 600;
+  }
+  .byoc-store-links a:hover { color: #fff; }
+  .byoc-help { margin-top: 9px; font-size: 11px; color: var(--dim); }
+  .byoc-help summary { cursor: pointer; color: var(--cyan); font-weight: 600; user-select: none; }
+  .byoc-help-body {
+    margin-top: 7px; padding: 8px 10px; border-radius: 8px;
+    background: rgba(3, 7, 14, 0.85); border: 1px solid rgba(255,255,255,0.08);
+    line-height: 1.55;
+  }
+  .byoc-help-body code {
+    display: block; margin: 3px 0 7px; padding: 4px 7px; border-radius: 5px;
+    background: rgba(255,255,255,0.06); color: #e6eefc; font-size: 10.5px;
+    word-break: break-all;
+  }
+
+  button.link-btn, a.link-btn {
+    background: none !important; border: none !important; box-shadow: none !important;
+    padding: 0 !important; font-family: inherit !important; letter-spacing: 0 !important;
+    color: var(--dim); font-size: 12px; text-decoration: none;
+  }
+  button.link-btn:hover, a.link-btn:hover { color: #fff !important; background: none !important; box-shadow: none !important; }
+
+  /* ---- BYOC Folder Troubleshooting Modal ---- */
+  #byocHelpModal {
+    position: fixed; inset: 0; z-index: 60;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+    background: rgba(2, 5, 10, 0.80);
+    backdrop-filter: blur(5px);
+  }
+  #byocHelpModal.open { display: flex; }
+  .byoc-modal-box {
+    width: 100%; max-width: 520px; max-height: calc(100vh - 40px); overflow-y: auto;
+    background: rgba(9, 15, 24, 0.96);
+    border: 2px solid #5f6f81;
+    outline: 1px solid #070b11;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(215, 232, 248, 0.42), 0 24px 70px rgba(0, 0, 0, 0.9);
+  }
+  .byoc-modal-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 15px;
+    background: linear-gradient(180deg, #566475 0%, #333e4c 48%, #202833 52%, #394656 100%);
+    border-bottom: 2px solid #121820;
+    font-family: var(--font-display); font-size: 13px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: #eef6ff;
+  }
+  .byoc-modal-body { padding: 18px 20px 16px; font-size: 13px; color: #cbd9e8; line-height: 1.55; }
+  .byoc-modal-body p { margin: 0 0 11px; }
+  .byoc-modal-body ul { margin: 0 0 16px; padding-left: 18px; display: flex; flex-direction: column; gap: 9px; }
+  .byoc-modal-body li { color: #b8cbe0; }
+  .byoc-modal-body a.inline-mode-link {
+    color: #5ea8ff; text-decoration: underline; cursor: pointer; font-weight: 600;
+  }
+  .byoc-modal-body a.inline-mode-link:hover { color: #9ad2ff; }
+  .byoc-modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .dev-unlock-box {
+    display: none; margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid rgba(130, 165, 200, 0.22);
+  }
+  .dev-unlock-box.open { display: block; }
+  .dev-unlock-row { display: flex; gap: 8px; align-items: center; }
+  .dev-unlock-row input { flex: 1; padding: 6px 10px; font-size: 12px; }
+  #devUnlockMsg { margin-top: 6px; font-size: 11px; color: var(--err); min-height: 15px; }
+
+  /* ---- Primary Action Stack (Authentic SWBF2 Metallic Capsules) ---- */
+  .main-actions { display: flex; flex-direction: column; gap: 10px; }
+  .hero-btn {
+    width: 100%; padding: 13px 18px; border-radius: 999px; font-size: 15px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .hero-btn .btn-left { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 1px; }
+  .hero-btn .btn-title { font-size: 15px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase; }
+  .hero-btn .btn-desc { font-family: "Tahoma", "Verdana", sans-serif; font-size: 11px; font-weight: 500; opacity: 0.85; letter-spacing: 0; }
+  .hero-btn .btn-badge {
+    font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+    background: rgba(0, 0, 0, 0.28); white-space: nowrap; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  button.secondary.hero-btn .btn-badge { background: rgba(0, 0, 0, 0.22); color: #0c141d; }
+  button.secondary.hero-btn:hover .btn-badge { color: #fff; }
+
+  /* ---- Multiplayer Lobby Browser View ---- */
+  #lobbyView, #createLobbyView { display: none; }
+  .lobby-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .lobby-header-left { display: flex; align-items: center; gap: 10px; }
+  .lobby-header h2 { margin: 0; font-size: 18px; font-weight: 700; color: #fff; }
+  .online-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--ok);
+    background: rgba(56, 211, 121, 0.12); border: 1px solid rgba(56, 211, 121, 0.3);
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .online-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ok); box-shadow: 0 0 8px var(--ok);
+  }
+
+  .lobby-toolbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .filter-tabs { display: flex; gap: 5px; flex-wrap: wrap; }
+  .filter-tab {
+    padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--dim);
+  }
+  .filter-tab.active {
+    background: rgba(245, 196, 81, 0.16); border-color: rgba(245, 196, 81, 0.55); color: var(--gold);
+  }
+  .lobby-search {
+    padding: 5px 10px; font-size: 12px; min-width: 170px;
+    background: rgba(5, 9, 17, 0.8); border-radius: 8px;
+  }
+
+  .room-list {
+    max-height: 360px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 7px;
+    margin-bottom: 12px; padding-right: 3px;
+  }
+  .room-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 11px 14px; border-radius: 11px;
+    background: rgba(6, 11, 20, 0.74); border: 1px solid rgba(255, 255, 255, 0.09);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .room-row.live { border-color: rgba(56, 211, 121, 0.28); background: rgba(10, 22, 30, 0.76); }
+  .room-row:hover { border-color: rgba(245, 196, 81, 0.45); background: rgba(14, 23, 39, 0.88); }
+  .room-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .room-title {
+    font-size: 14px; font-weight: 700; color: #fff;
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  }
+  .room-sub { font-size: 12px; color: var(--dim); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .tag {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 7px; border-radius: 999px; text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.08); color: var(--dim);
+  }
+  .tag.live { background: rgba(56, 211, 121, 0.18); color: var(--ok); }
+  .tag.playing { background: rgba(76, 195, 255, 0.18); color: var(--cyan); }
+  .tag.gold { background: rgba(245, 196, 81, 0.16); color: var(--gold); }
+  .tag.warn { background: rgba(255, 170, 68, 0.18); color: var(--warn); }
+  .room-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .player-count {
+    font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06); color: var(--dim); white-space: nowrap;
+  }
+  .player-count.active {
+    background: rgba(56, 211, 121, 0.14); color: var(--ok);
+    border: 1px solid rgba(56, 211, 121, 0.3);
+  }
+
+  /* ---- Custom Lobby Creator ---- */
+  .creator-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    max-height: calc(100vh - 230px); overflow-y: auto; padding-right: 4px; margin-bottom: 12px;
+  }
+  @media (max-width: 720px) { .creator-grid { grid-template-columns: 1fr; } }
+  .creator-section {
+    background: rgba(5, 9, 18, 0.72); border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px; padding: 13px 14px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .creator-section.full { grid-column: 1 / -1; }
+  .creator-section h3 {
+    margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold);
+  }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .field-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; color: var(--dim); font-weight: 600; }
+  .field input, .field select { padding: 6px 9px; font-size: 12px; width: 100%; }
+  .check-grid { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+  .check-item {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--ink); cursor: pointer;
+  }
+  .playlist-chips {
+    display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px;
+    padding: 6px; border-radius: 8px; background: rgba(3, 6, 12, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .map-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    background: rgba(76, 195, 255, 0.14); border: 1px solid rgba(76, 195, 255, 0.35); color: #dff4ff;
+  }
+  .map-chip button {
+    padding: 0 3px; border: none; background: none; color: #ff9c9c; font-weight: 700; font-size: 13px;
+  }
+  .creator-actions {
+    display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap;
+    padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* ---- Live Multiplayer Staging Lobby Overlay (replaces Profile Management wait!) ---- */
+  #mpLobbyOverlay {
+    position: absolute; inset: 0; z-index: 28;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+    background: radial-gradient(circle at 50% 25%, rgba(20, 48, 86, 0.72), rgba(3, 6, 12, 0.92));
+    backdrop-filter: blur(8px);
+  }
+  #mpLobbyOverlay.open { display: flex; }
+  .staging-card {
+    width: 100%; max-width: 780px; max-height: calc(100vh - 48px); overflow-y: auto;
+    background: rgba(9, 15, 27, 0.95); border: 1px solid rgba(245, 196, 81, 0.25);
+    border-radius: 16px; padding: 24px 26px;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.85);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .staging-top {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09); padding-bottom: 14px;
+  }
+  .staging-top h2 { margin: 0 0 4px; font-size: 21px; color: #fff; }
+  .staging-status-bar {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px;
+    background: rgba(76, 195, 255, 0.10); border: 1px solid rgba(76, 195, 255, 0.28);
+    font-size: 13px; color: #e2f5ff;
+  }
+  .staging-status-bar.ready {
+    background: rgba(56, 211, 121, 0.11); border-color: rgba(56, 211, 121, 0.34); color: #d6ffe5;
+  }
+  .staging-status-bar.error {
+    background: rgba(255, 107, 107, 0.12); border-color: rgba(255, 107, 107, 0.38); color: #ffd4d4;
+  }
+  .staging-body { display: grid; grid-template-columns: 1.05fr 1fr; gap: 14px; }
+  @media (max-width: 680px) { .staging-body { grid-template-columns: 1fr; } }
+  .staging-box {
+    background: rgba(5, 9, 17, 0.78); border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 11px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .staging-box h3 {
+    margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.13em; color: var(--gold);
+    display: flex; justify-content: space-between;
+  }
+  .roster-list { display: flex; flex-direction: column; gap: 6px; max-height: 190px; overflow-y: auto; }
+  .roster-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.04); font-size: 13px;
+  }
+  .chat-log {
+    height: 155px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px;
+    font-size: 12px; padding-right: 4px; user-select: text;
+  }
+  .chat-msg { line-height: 1.35; word-break: break-word; }
+  .chat-msg b { color: var(--gold); }
+  .chat-msg.sys { color: var(--dim); font-style: italic; }
+  .chat-form { display: flex; gap: 6px; }
+  .chat-form input { flex: 1; padding: 6px 10px; font-size: 12px; }
+  .staging-footer {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    border-top: 1px solid rgba(255, 255, 255, 0.09); padding-top: 14px;
+  }
+
+  .card-footer {
+    margin-top: 18px; padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: var(--dim);
+  }
+  .status-ready { display: inline-flex; align-items: center; gap: 6px; }
+  .link-btn { background: none; border: none; padding: 0; color: var(--dim); font-size: 12px; cursor: pointer; }
+  .link-btn:hover { color: #fff !important; }
+
+  #advPanel {
+    display: none; margin-top: 12px; padding: 12px;
+    border-radius: 10px; background: rgba(4, 8, 15, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08); font-size: 12px;
+  }
+  #advPanel.open { display: block; }
+  .row-inline { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  #errMsg { color: var(--err); margin: 10px 0 0; display: none; font-weight: 600; text-align: center; }
+
+  /* ---- Slide-out In-Game Settings Drawer ---- */
+  #drawer {
+    position: absolute; top: 52px; right: 12px; width: 350px; max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 68px); overflow: auto; z-index: 25;
+    background: var(--card); backdrop-filter: blur(16px);
+    border: 1px solid var(--card-border); border-radius: 12px; padding: 16px;
+    display: none; flex-direction: column; gap: 12px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.7);
+  }
+  #drawer.open { display: flex; }
+  #drawer h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--gold); }
+
+  /* ---- PointerLock Hint Banner ---- */
+  #lockHint {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 14;
+    background: rgba(6, 11, 19, 0.85); border: 1px solid rgba(245, 196, 81, 0.45);
+    color: var(--gold); padding: 6px 14px; border-radius: 999px; font-size: 12px;
+    display: none; pointer-events: none;
+  }
+
+  /* ---- Real-Time Download & Map Loading Progress Overlay ---- */
+  #loadingOverlay {
+    position: absolute; inset: 0; z-index: 42;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+    background:
+      radial-gradient(circle at 50% 25%, rgba(28, 62, 112, 0.60) 0%, transparent 58%),
+      rgba(3, 6, 12, 0.88);
+    backdrop-filter: blur(12px);
+  }
+  #loadingOverlay.open { display: flex; }
+  .load-card {
+    width: 100%; max-width: 470px;
+    background: rgba(9, 15, 27, 0.96);
+    border: 1px solid rgba(245, 196, 81, 0.30);
+    border-radius: 16px;
+    padding: 26px 26px 22px;
+    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.85), 0 1px 0 rgba(255, 255, 255, 0.07) inset;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .load-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .load-head h2 {
+    margin: 3px 0 0; font-size: 20px; font-weight: 800; letter-spacing: 0.02em; color: #fff;
+  }
+  .load-spinner {
+    width: 24px; height: 24px; flex-shrink: 0; margin-top: 2px;
+    border-radius: 50%;
+    border: 2.5px solid rgba(245, 196, 81, 0.22);
+    border-top-color: var(--gold);
+    animation: swbf2-spin 0.85s linear infinite;
+  }
+  @keyframes swbf2-spin { to { transform: rotate(360deg); } }
+  .load-stage-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: 13px; color: #e2ecf8; font-weight: 600;
+  }
+  .load-pct { color: var(--gold); font-weight: 700; white-space: nowrap; }
+  .load-bar-track {
+    position: relative; width: 100%; height: 10px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+  .load-bar-fill {
+    height: 100%; width: 4%; border-radius: 999px;
+    background: linear-gradient(90deg, #4cc3ff 0%, #f5c451 100%);
+    box-shadow: 0 0 14px rgba(245, 196, 81, 0.45);
+    transition: width 0.14s ease-out;
+  }
+  .load-bar-fill.streaming {
+    background: linear-gradient(90deg, #4cc3ff 0%, #f5c451 50%, #4cc3ff 100%);
+    background-size: 200% 100%;
+    animation: swbf2-shimmer 1.3s linear infinite;
+  }
+  @keyframes swbf2-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+  .load-meta {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    font-size: 11px; color: var(--dim);
+  }
+  .load-file-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 11px; border-radius: 9px;
+    background: rgba(4, 8, 16, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 11px; color: var(--cyan);
+    overflow: hidden;
+  }
+  .load-file-row span.file-label { color: var(--dim); flex-shrink: 0; }
+  .load-file-row b {
+    font-weight: 600; color: #dff4ff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .load-tip {
+    font-size: 11px; color: rgba(143, 163, 191, 0.82); line-height: 1.45;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    padding-top: 10px;
+  }
+
+  /* ---- Original SWBF2 In-Game Loading Screen Banner (Decoded Live From GameData/load/*.lvl) ---- */
+  #loadBannerOverlay {
+    position: absolute; inset: 0; z-index: 35;
+    display: none; background: #000; overflow: hidden;
+    pointer-events: none;
+    font-family: Verdana, "Trebuchet MS", Tahoma, Arial, sans-serif;
+  }
+  #loadBannerOverlay.open { display: block; }
+  #loadBannerCanvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: fill; display: block;
+  }
+  .lb-top-bar {
+    position: absolute; top: 0; left: 0; right: 0; height: 12.5%;
+    padding: 0 5%;
+    display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  }
+  #lbTitle, #lbMode {
+    font-size: clamp(13px, 1.35vw, 19px);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #dcdcdc;
+    text-shadow: 0 1px 2px #000;
+    white-space: nowrap;
+  }
+  #lbTipBox {
+    position: absolute;
+    left: 34.4%;
+    top: 16.8%;
+    width: 53.6%;
+    max-width: calc(100% - 37%);
+    padding: 13px 16px 14px;
+    background: rgba(58, 64, 76, 0.56);
+    border: 14px solid #6b7280;
+    border-image-source: var(--lb-tips-box-img, none);
+    border-image-slice: 16 fill;
+    border-image-width: 14px;
+    border-image-repeat: stretch;
+    color: #d6deed;
+    font-size: clamp(10.5px, 1.02vw, 13.5px);
+    font-weight: 600;
+    line-height: 1.42;
+    white-space: pre-line;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    display: none;
+  }
+  .lb-bottom-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 12.5%;
+    padding: 0 5%;
+    display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: nowrap;
+  }
+  .lb-loading-wrap { display: flex; align-items: center; gap: 9px; }
+  .lb-loading-word {
+    font-size: clamp(13px, 1.25vw, 17px);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #8f96a0;
+    animation: lb-word-pulse 1.3s ease-in-out infinite;
+    text-shadow: 0 1px 2px #000;
+  }
+  @keyframes lb-word-pulse {
+    0%, 100% { color: #7a818c; }
+    50% { color: #c4cbd4; }
+  }
+  .lb-leds { display: flex; align-items: center; gap: 3px; }
+  .lb-leds i {
+    display: block;
+    width: clamp(13px, 1.3vw, 18px);
+    height: clamp(13px, 1.3vw, 18px);
+    border-radius: 50%;
+    background-image: var(--lb-led-icon-img, radial-gradient(circle at 38% 32%, #ff9a9a 0%, #c81e1e 50%, #4b1010 82%, #7a8088 100%));
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.34;
+    filter: brightness(0.68) saturate(0.8);
+    transition: opacity 0.22s ease, filter 0.22s ease;
+  }
+  .lb-leds i.lit {
+    opacity: 1;
+    filter: brightness(1.18) saturate(1.15);
+  }
+  #lbStreamMeta {
+    font-size: 11px; color: #7a8494; text-shadow: 0 1px 2px #000;
+    white-space: nowrap;
+  }
+
+  /* ---- Compact Non-Blocking Map & Asset Download Pill (Keeps Original In-Game Loading Banners Visible!) ---- */
+  #streamToast {
+    position: absolute; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%); z-index: 24;
+    display: none; flex-direction: column; gap: 6px;
+    min-width: 260px; max-width: calc(100vw - 32px);
+    padding: 9px 15px; border-radius: 12px;
+    background: rgba(6, 11, 20, 0.88); backdrop-filter: blur(10px);
+    border: 1px solid rgba(245, 196, 81, 0.35);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+    font-size: 12px; color: #eaf4ff;
+    pointer-events: none;
+  }
+  #streamToast.open { display: flex; }
+  .toast-row { display: flex; align-items: center; gap: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toast-bar { width: 100%; height: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+  .toast-bar > i {
+    display: block; height: 100%; width: 35%; border-radius: 999px;
+    background: linear-gradient(90deg, #4cc3ff 0%, #f5c451 50%, #4cc3ff 100%);
+    background-size: 200% 100%;
+    animation: swbf2-shimmer 1.2s linear infinite;
+    transition: width 0.14s ease-out;
+  }
+  .toast-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+    animation: swbf2-pulse 1s ease-in-out infinite;
+  }
+  @keyframes swbf2-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* ---- Android & iOS Multi-Touch Controls Overlay ---- */
+  #touchControls {
+    position: absolute; inset: 0; z-index: 13;
+    display: none; pointer-events: none;
+    touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+  }
+  #touchControls.active { display: block; }
+  #tcCombat {
+    position: absolute; inset: 0; display: none; pointer-events: none;
+  }
+  #tcStickZone {
+    position: absolute; left: 0; top: 54px; bottom: 0; width: 46%;
+    pointer-events: auto; touch-action: none;
+  }
+  #tcLookZone {
+    position: absolute; right: 0; top: 54px; bottom: 0; width: 54%;
+    pointer-events: auto; touch-action: none;
+  }
+  #tcStickBase {
+    position: absolute;
+    left: calc(92px + env(safe-area-inset-left, 0px));
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    width: 124px; height: 124px;
+    transform: translate(-50%, 50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, rgba(10, 18, 32, 0.28) 100%);
+    border: 2px solid rgba(255, 255, 255, 0.20);
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+    transition: opacity 0.15s;
+    opacity: 0.68;
+  }
+  #tcStickBase.active {
+    transform: translate(-50%, -50%);
+    bottom: auto;
+    opacity: 0.98;
+    border-color: rgba(245, 196, 81, 0.55);
+  }
+  #tcStickKnob {
+    position: absolute; left: 50%; top: 50%;
+    width: 52px; height: 52px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.42), rgba(180, 200, 228, 0.18));
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  }
+  #tcSprintTag {
+    position: absolute; left: 50%; top: -24px; transform: translateX(-50%);
+    font-size: 10px; font-weight: 800; letter-spacing: 0.12em;
+    color: var(--gold); text-shadow: 0 1px 4px #000;
+    opacity: 0; transition: opacity 0.12s; white-space: nowrap;
+  }
+  #tcSprintTag.on { opacity: 1; }
+
+  .tc-btn {
+    position: absolute; pointer-events: auto; touch-action: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: rgba(8, 15, 28, 0.56);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1.5px solid rgba(255, 255, 255, 0.28);
+    color: rgba(245, 249, 255, 0.94);
+    font-weight: 800; font-size: 11px; letter-spacing: 0.04em;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.42);
+    transition: transform 0.07s ease, background 0.07s ease, border-color 0.07s ease;
+    padding: 0;
+  }
+  .tc-btn.pressed {
+    transform: scale(0.92);
+    background: rgba(245, 196, 81, 0.34);
+    border-color: var(--gold);
+    color: #fff;
+  }
+  .tc-btn.fire {
+    width: 78px; height: 78px; font-size: 13px;
+    right: calc(26px + env(safe-area-inset-right, 0px));
+    bottom: calc(34px + env(safe-area-inset-bottom, 0px));
+    background: radial-gradient(circle at 35% 30%, rgba(245, 196, 81, 0.42), rgba(180, 120, 18, 0.42));
+    border: 2px solid rgba(245, 196, 81, 0.85);
+    box-shadow: 0 0 22px rgba(245, 196, 81, 0.32), 0 6px 18px rgba(0, 0, 0, 0.5);
+  }
+  .tc-btn.alt {
+    width: 58px; height: 58px; font-size: 10px;
+    right: calc(116px + env(safe-area-inset-right, 0px));
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    border-color: rgba(76, 195, 255, 0.65);
+    background: rgba(20, 62, 92, 0.54);
+    color: #ddf5ff;
+  }
+  .tc-btn.jump {
+    width: 56px; height: 56px; font-size: 10px;
+    right: calc(22px + env(safe-area-inset-right, 0px));
+    bottom: calc(124px + env(safe-area-inset-bottom, 0px));
+  }
+  .tc-btn.crouch {
+    width: 50px; height: 50px; font-size: 10px;
+    right: calc(92px + env(safe-area-inset-right, 0px));
+    bottom: calc(106px + env(safe-area-inset-bottom, 0px));
+  }
+  .tc-btn.reload {
+    width: 48px; height: 48px; font-size: 10px;
+    right: calc(152px + env(safe-area-inset-right, 0px));
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+  .tc-btn.use {
+    width: 48px; height: 48px; font-size: 10px;
+    right: calc(184px + env(safe-area-inset-right, 0px));
+    bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+    border-color: rgba(56, 211, 121, 0.58);
+    color: #d6ffe5;
+  }
+  .tc-btn.zoom {
+    width: 46px; height: 46px; font-size: 10px;
+    right: calc(92px + env(safe-area-inset-right, 0px));
+    bottom: calc(166px + env(safe-area-inset-bottom, 0px));
+  }
+  .tc-btn.swap-pri {
+    width: 46px; height: 46px; font-size: 9px;
+    right: calc(148px + env(safe-area-inset-right, 0px));
+    bottom: calc(144px + env(safe-area-inset-bottom, 0px));
+  }
+  .tc-btn.swap-sec {
+    width: 44px; height: 44px; font-size: 9px;
+    right: calc(204px + env(safe-area-inset-right, 0px));
+    bottom: calc(114px + env(safe-area-inset-bottom, 0px));
+  }
+  .tc-pill {
+    position: absolute; pointer-events: auto; touch-action: none;
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: rgba(8, 15, 28, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: var(--ink); font-size: 11px; font-weight: 700;
+  }
+  .tc-pill.pressed { background: rgba(245, 196, 81, 0.34); border-color: var(--gold); }
+  #tcBtnPause {
+    left: calc(14px + env(safe-area-inset-left, 0px));
+    top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+  #tcBtnScore {
+    left: calc(88px + env(safe-area-inset-left, 0px));
+    top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+
+  /* Menu / Spawn Screen Helper Bar (unobstructed canvas tapping!) */
+  #tcMenu {
+    position: absolute;
+    right: calc(14px + env(safe-area-inset-right, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    display: none; gap: 8px; align-items: center;
+    pointer-events: none;
+  }
+  #tcMenu .tc-menu-btn {
+    pointer-events: auto; touch-action: none;
+    padding: 9px 15px; border-radius: 10px;
+    background: rgba(8, 15, 28, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff; font-size: 12px; font-weight: 700;
+    backdrop-filter: blur(8px);
+  }
+  #tcMenu .tc-menu-btn.gold {
+    border-color: rgba(245, 196, 81, 0.65);
+    color: var(--gold);
+  }
+  #tcMenu .tc-menu-btn.pressed {
+    background: rgba(245, 196, 81, 0.35);
+    transform: scale(0.95);
+  }
+
+  /* Portrait Rotation Hint on Phones */
+  #tcRotateHint {
+    position: absolute; left: 50%; top: calc(56px + env(safe-area-inset-top, 0px));
+    transform: translateX(-50%);
+    display: none; align-items: center; gap: 10px;
+    padding: 8px 14px; border-radius: 999px;
+    background: rgba(9, 15, 27, 0.90);
+    border: 1px solid rgba(245, 196, 81, 0.45);
+    color: var(--gold); font-size: 12px; font-weight: 600;
+    pointer-events: auto; white-space: nowrap; z-index: 16;
+  }
+  #tcRotateHint.open { display: inline-flex; }
+  #tcRotateDismiss {
+    background: none; border: none; color: var(--dim); padding: 0 2px; font-size: 14px; font-weight: 700;
+  }
+
+  /* ---- Mobile-Responsive Portal & HUD Adjustments ---- */
+  @media (max-width: 720px), (max-height: 500px) {
+    #hudBar {
+      left: calc(10px + env(safe-area-inset-left, 0px));
+      right: calc(10px + env(safe-area-inset-right, 0px));
+      top: calc(8px + env(safe-area-inset-top, 0px));
+      gap: 5px;
+    }
+    #barActions button { padding: 5px 9px; font-size: 12px; }
+    #launcher { padding: 10px; }
+    #launcherCard { padding: 20px 18px 16px; border-radius: 14px; }
+    .brand { margin-bottom: 14px; }
+    .brand h1 { font-size: 22px; }
+    .hero-btn { padding: 12px 14px; }
+    #drawer { top: 44px; right: 8px; width: 300px; padding: 12px; }
+    .tc-btn.fire { width: 68px; height: 68px; font-size: 12px; }
+    .tc-btn.alt { width: 52px; height: 52px; right: calc(104px + env(safe-area-inset-right, 0px)); }
+    .tc-btn.jump { width: 50px; height: 50px; bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
+    .tc-btn.crouch { width: 46px; height: 46px; right: calc(82px + env(safe-area-inset-right, 0px)); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+    .tc-btn.reload { width: 44px; height: 44px; right: calc(138px + env(safe-area-inset-right, 0px)); bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+    .tc-btn.use { width: 44px; height: 44px; right: calc(168px + env(safe-area-inset-right, 0px)); }
+    .tc-btn.zoom { width: 42px; height: 42px; right: calc(82px + env(safe-area-inset-right, 0px)); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+    .tc-btn.swap-pri { width: 42px; height: 42px; right: calc(134px + env(safe-area-inset-right, 0px)); bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+    .tc-btn.swap-sec { width: 40px; height: 40px; right: calc(184px + env(safe-area-inset-right, 0px)); bottom: calc(102px + env(safe-area-inset-bottom, 0px)); }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gameCanvas" width="1600" height="900" tabindex="0"></canvas>
+
+  <div id="hudBar">
+    <span class="pill diag mono">SWBF2 <b id="stFps">0</b> fps · <b id="stState">ready</b></span>
+    <span class="pill diag mono">screen <b id="stScreen">—</b></span>
+    <span class="pill diag mono">draws <b id="stDraws">0</b> · tris <b id="stTris">0</b></span>
+    <span class="pill diag mono">
+      audio <b id="stAudio">off</b>
+      <span class="meter"><i id="stAudioBar"></i></span>
+    </span>
+    <span class="pill mono" id="stNet" style="display:none;"><b id="stNetVal">—</b></span>
+    <span class="pill diag mono" id="stLock">cursor: menu</span>
+    <div id="barActions">
+      <button id="btnLaunchMp" style="display:none;" class="primary">Start Match</button>
+      <button id="btnCopyInvite" style="display:none;" class="accent">Copy Invite</button>
+      <button id="btnVoiceHud" style="display:none;" title="Toggle WebRTC Voice Chat (hold V for Push-to-Talk)">Voice: Off</button>
+      <button id="btnLeaveMpHud" style="display:none;" class="danger">Leave Lobby</button>
+      <button id="btnMute">Mute</button>
+      <button id="btnDrawer">Options</button>
+      <button id="btnFs">Fullscreen</button>
+    </div>
+  </div>
+
+  <div id="lockHint">Click to lock mouse · Esc pauses (hold Esc to exit fullscreen) · F1 accepts Hero · F8 toggles HUD</div>
+
+  <!-- Android & iOS Multi-Touch Controls Overlay -->
+  <div id="touchControls" aria-label="Touch Controls">
+    <div id="tcRotateHint">
+      <span>Rotate to landscape for best controls</span>
+      <button id="tcRotateDismiss" type="button" aria-label="Dismiss">×</button>
+    </div>
+
+    <div id="tcCombat">
+      <div id="tcStickZone">
+        <div id="tcStickBase">
+          <span id="tcSprintTag">SPRINT</span>
+          <div id="tcStickKnob"></div>
+        </div>
+      </div>
+      <div id="tcLookZone"></div>
+
+      <button id="tcBtnPause" type="button" class="tc-pill">Menu</button>
+      <button id="tcBtnScore" type="button" class="tc-pill">Score</button>
+
+      <button id="tcBtnFire" type="button" class="tc-btn fire">FIRE</button>
+      <button id="tcBtnAlt" type="button" class="tc-btn alt">ALT</button>
+      <button id="tcBtnJump" type="button" class="tc-btn jump">JUMP</button>
+      <button id="tcBtnCrouch" type="button" class="tc-btn crouch">ROLL</button>
+      <button id="tcBtnReload" type="button" class="tc-btn reload">RLD</button>
+      <button id="tcBtnUse" type="button" class="tc-btn use">USE</button>
+      <button id="tcBtnZoom" type="button" class="tc-btn zoom">ZOOM</button>
+      <button id="tcBtnSwapPri" type="button" class="tc-btn swap-pri">WEP</button>
+      <button id="tcBtnSwapSec" type="button" class="tc-btn swap-sec">GRN</button>
+    </div>
+
+    <div id="tcMenu">
+      <button id="tcBtnMenuEsc" type="button" class="tc-menu-btn">Back</button>
+      <button id="tcBtnMenuEnter" type="button" class="tc-menu-btn gold">Enter ↵</button>
+    </div>
+  </div>
+
+  <!-- Real-Time Download & Map Loading Progress Overlay -->
+  <div id="loadingOverlay" aria-live="polite">
+    <div class="load-card">
+      <div class="load-head">
+        <div>
+          <span class="brand-kicker" id="loadKicker">DOWNLOADING GAME ASSETS</span>
+          <h2 id="loadTitle">Loading Battlefront II</h2>
+        </div>
+        <div class="load-spinner" aria-hidden="true"></div>
+      </div>
+
+      <div class="load-stage-row">
+        <span id="loadStage">Preparing engine…</span>
+        <span id="loadPct" class="load-pct mono">0%</span>
+      </div>
+
+      <div class="load-bar-track">
+        <div id="loadBarFill" class="load-bar-fill"></div>
+      </div>
+
+      <div class="load-meta mono">
+        <span id="loadBytes">Starting download…</span>
+        <span id="loadSpeed">Step 1 / 5</span>
+      </div>
+
+      <div id="loadFileRow" class="load-file-row mono" style="display:none;">
+        <span class="file-label">Asset:</span>
+        <b id="loadFile">—</b>
+      </div>
+
+      <div class="load-tip" id="loadTip">
+        First-time loads stream &amp; cache game data locally in your browser — future visits and maps load nearly instantaneously.
+      </div>
+    </div>
+  </div>
+
+  <!-- Original SWBF2 Planet Loading Screen Banner (live-decoded from retail GameData/load/*.lvl) -->
+  <div id="loadBannerOverlay" aria-live="polite">
+    <canvas id="loadBannerCanvas" width="1024" height="1024"></canvas>
+    <div class="lb-top-bar">
+      <div id="lbTitle">Battlefront II</div>
+      <div id="lbMode"></div>
+    </div>
+    <div id="lbTipBox"></div>
+    <div class="lb-bottom-bar">
+      <div class="lb-loading-wrap">
+        <span class="lb-loading-word">Loading</span>
+        <div class="lb-leds" id="lbLeds" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+      </div>
+      <div id="lbStreamMeta" class="mono"></div>
+    </div>
+  </div>
+
+  <!-- Compact Non-Blocking Download Bar (preserves original SWBF2 in-game planet loading banners) -->
+  <div id="streamToast" class="mono">
+    <div class="toast-row">
+      <i class="toast-dot"></i>
+      <span id="streamToastText">Downloading map assets…</span>
+    </div>
+    <div class="toast-bar"><i id="streamToastFill"></i></div>
+  </div>
+
+  <!-- Live Multiplayer Staging Lobby Overlay -->
+  <div id="mpLobbyOverlay">
+    <div class="staging-card">
+      <div class="staging-top">
+        <div>
+          <span class="brand-kicker" id="stagingRoleBadge">MULTIPLAYER LOBBY</span>
+          <h2 id="stagingTitle">Lobby</h2>
+          <div class="room-sub" id="stagingMetaLine">—</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span class="online-pill"><i class="online-dot"></i><span id="stagingPlayerCount">1 / 16</span></span>
+        </div>
+      </div>
+
+      <div class="staging-status-bar" id="stagingStatusBar">
+        <span id="stagingStatusText">Initializing multiplayer session…</span>
+      </div>
+
+      <div class="staging-body">
+        <div class="staging-box">
+          <h3><span>Players in Lobby</span><span id="stagingNetLink" class="mono">LAN</span></h3>
+          <div id="lobbyRoster" class="roster-list"></div>
+          <div id="stagingPlaylistSummary" class="mono" style="font-size:11px; color:var(--dim); margin-top:auto;"></div>
+        </div>
+
+        <div class="staging-box">
+          <h3><span>Lobby Chat</span></h3>
+          <div id="lobbyChatLog" class="chat-log"></div>
+          <form id="lobbyChatForm" class="chat-form">
+            <input id="inpLobbyChat" placeholder="Say something to the lobby…" maxlength="200" autocomplete="off">
+            <button type="submit" class="accent" style="padding:5px 11px; font-size:12px;">Send</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="staging-footer">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btnOverlayLeave" class="danger">← Leave Lobby</button>
+          <button id="btnOverlayInvite" class="accent">Copy Invite Link</button>
+          <button id="btnOverlayVoice" class="secondary" title="Enable WebRTC Voice Chat (hold V for Push-to-Talk)">Voice: Off</button>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span id="stagingWaitNote" style="font-size:12px; color:var(--dim);"></span>
+          <button id="btnOverlayStartMatch" class="primary" style="display:none; padding:10px 22px; font-size:15px;">Start Match →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside id="drawer">
+    <div>
+      <h3>Quick Launch</h3>
+      <div class="row-inline" style="margin-bottom:6px;">
+        <button id="btnShell">Main Menu</button>
+        <button id="btnTat">Mos Eisley</button>
+        <button id="btnEli">Hero Assault</button>
+        <button id="btnSpa">Space Yavin</button>
+      </div>
+      <div class="row-inline">
+        <select id="selQuickMap" style="flex:1; font-size:12px;"></select>
+        <button id="btnQuickMapGo" class="accent">Go</button>
+      </div>
+    </div>
+    <div>
+      <h3>Display Resolution</h3>
+      <div class="row-inline">
+        <select id="selRes" style="flex:1;">
+          <option value="800x600">800 × 600 (4:3 Classic)</option>
+          <option value="1024x768">1024 × 768 (4:3 High)</option>
+          <option value="1280x720">1280 × 720 (HD 16:9)</option>
+          <option value="1600x900" selected>1600 × 900 (HD+ 16:9)</option>
+          <option value="1920x1080">1920 × 1080 (Full HD 16:9)</option>
+          <option value="2560x1440">2560 × 1440 (QHD 16:9)</option>
+        </select>
+        <button id="btnApplyRes">Apply</button>
+      </div>
+      <div id="resStatusMsg" class="mono" style="font-size:11px; color:var(--dim); margin-top:4px;"></div>
+    </div>
+    <div>
+      <h3>Audio &amp; Music</h3>
+      <div class="row-inline" style="margin-bottom:8px;">
+        <input id="rngVolume" type="range" min="0" max="100" value="80" style="flex:1; padding:0; accent-color:var(--gold);">
+        <span id="lblVolume" class="mono" style="font-size:12px; min-width:36px; text-align:right;">80%</span>
+      </div>
+      <label class="check-item" style="margin-bottom:4px;">
+        <input type="checkbox" id="chkMusicDrawer">
+        <span>Stream Music</span>
+      </label>
+      <div style="font-size:11px; color:var(--dim);">Off by default to save bandwidth (SFX &amp; voiceovers stay on).</div>
+    </div>
+    <div>
+      <h3>Touch Controls (Android / iOS)</h3>
+      <div class="row-inline" style="margin-bottom:8px;">
+        <label for="selTouchMode" style="font-size:12px; color:var(--dim);">Mode</label>
+        <select id="selTouchMode" style="flex:1; font-size:12px;">
+          <option value="auto" selected>Auto (Phones &amp; Tablets)</option>
+          <option value="on">Always On</option>
+          <option value="off">Off (Gamepad / Keyboard)</option>
+        </select>
+      </div>
+      <div class="row-inline">
+        <label for="rngTouchSens" style="font-size:12px; color:var(--dim);">Aim Sens</label>
+        <input id="rngTouchSens" type="range" min="40" max="250" value="120" style="flex:1; padding:0; accent-color:var(--gold);">
+        <span id="lblTouchSens" class="mono" style="font-size:12px; min-width:38px; text-align:right;">1.2×</span>
+      </div>
+    </div>
+    <div>
+      <h3>Online Multiplayer</h3>
+      <div class="row-inline" style="margin-bottom:6px;">
+        <input id="inpRoomDrawer" value="mos_eisley" placeholder="Lobby name" style="flex:1;">
+        <button id="btnHostMp" class="accent">Host</button>
+        <button id="btnJoinMp">Join</button>
+      </div>
+      <div class="row-inline" style="margin-bottom:6px;">
+        <button id="btnBackToLobbies" style="flex:1;">Open Lobby Browser</button>
+      </div>
+      <div id="mpDrawerInfo" class="mono" style="font-size:11px; color:var(--dim);">Offline</div>
+    </div>
+    <div>
+      <h3>Local Saves &amp; Cache</h3>
+      <div id="vfsDrawerInfo" class="mono" style="font-size:11px; color:var(--dim); margin-bottom:8px;">Loading storage info…</div>
+      <div class="row-inline">
+        <button id="btnExportSaves">Export Saves</button>
+        <button id="btnImportSaves">Import Saves</button>
+        <input id="fileImportSaves" type="file" accept=".json,.profile,.gc,.rote,.sav" multiple style="display:none;">
+        <button id="btnClearCache" class="danger">Clear Cache</button>
+      </div>
+      <div id="saveDrawerStatus" class="mono" style="font-size:11px; color:var(--ok); margin-top:5px;"></div>
+    </div>
+  </aside>
+
+  <div id="launcher">
+    <div id="launcherCard">
+      <div class="brand">
+        <span class="brand-kicker">SWBF2O · Unofficial Community Project</span>
+        <h1>SWBF2O</h1>
+        <p class="brand-sub">Choose a username and jump straight into battle</p>
+      </div>
+
+      <!-- Direct Invite Banner (shown when opening ?join=...) -->
+      <div id="inviteBanner">
+        <div class="inv-title" id="inviteTitle">You were invited to join a multiplayer lobby!</div>
+        <button id="btnAcceptInvite" class="primary" style="width:100%; padding:11px;">Join Invited Lobby →</button>
+      </div>
+
+      <!-- Main Landing View: Username + Play Online + Single Player -->
+      <div id="mainView">
+        <div class="user-field">
+          <label for="inpPlayerName">
+            <span>Username</span>
+            <span class="hint">No registration required</span>
+          </label>
+          <input id="inpPlayerName" value="Trooper" maxlength="24" placeholder="Enter your username…" autocomplete="off" spellcheck="false">
+        </div>
+
+        <!-- Bring-Your-Own-Copy (BYOC) Local GameData Card -->
+        <div id="byocCard" class="byoc-card">
+          <div class="byoc-top">
+            <span class="byoc-title" id="byocTitle">Local Game Files Required</span>
+            <span class="tag gold" id="byocBadge">Bring Your Own Copy</span>
+          </div>
+          <div class="byoc-status" id="byocStatus">
+            Select your legal <strong>Star Wars Battlefront II (2005)</strong> folder (Steam, GOG, or Disc).
+            Files stay 100% on your device and are never uploaded.
+          </div>
+          <div class="byoc-actions">
+            <button id="btnByocReconnect" type="button" class="primary" style="display:none; padding:7px 14px; font-size:12px;">Reconnect GameData</button>
+            <button id="btnByocPick" type="button" class="accent" style="padding:7px 14px; font-size:12px;">Select GameData Folder…</button>
+            <button id="btnByocFallback" type="button" style="display:none; padding:7px 12px; font-size:12px;">Browse Folder…</button>
+            <input id="fileByocFolder" type="file" webkitdirectory directory multiple style="display:none;">
+          </div>
+          <div class="byoc-store-links">
+            <span>Need a legal copy?</span>
+            <a href="https://store.steampowered.com/app/6060/STAR_WARS_Battlefront_II_Classic_2005/" target="_blank" rel="noopener noreferrer">Buy on Steam</a>
+            <span>·</span>
+            <a href="https://www.gog.com/en/game/star_wars_battlefront_ii" target="_blank" rel="noopener noreferrer">Buy on GOG</a>
+          </div>
+          <details class="byoc-help">
+            <summary>Where do I find my GameData folder?</summary>
+            <div class="byoc-help-body">
+              You can select either the main game folder, <b>GameData</b>, or <b>GameData/data/_lvl_pc</b>:
+              <div><b>Steam (Windows):</b></div>
+              <code>C:\Program Files (x86)\Steam\steamapps\common\Star Wars Battlefront II Classic\GameData</code>
+              <div><b>Steam (Linux / Steam Deck):</b></div>
+              <code>~/.local/share/Steam/steamapps/common/Star Wars Battlefront II Classic/GameData</code>
+              <div><b>GOG Offline Installer / GOG Galaxy:</b></div>
+              <code>C:\GOG Games\Star Wars - Battlefront 2\GameData</code>
+              <code>C:\Program Files (x86)\GOG Galaxy\Games\Star Wars Battlefront II\GameData</code>
+              <div style="opacity:0.9;">Need a copy? <a href="https://store.steampowered.com/app/6060/STAR_WARS_Battlefront_II_Classic_2005/" target="_blank" rel="noopener noreferrer" style="color:var(--cyan); text-decoration:underline;">Buy on Steam</a> or <a href="https://www.gog.com/en/game/star_wars_battlefront_ii" target="_blank" rel="noopener noreferrer" style="color:var(--cyan); text-decoration:underline;">Buy on GOG</a>.</div>
+            </div>
+          </details>
+        </div>
+
+        <div class="main-actions">
+          <button id="btnPlayOnline" class="primary hero-btn">
+            <span class="btn-left">
+              <span class="btn-title">Play Online</span>
+              <span class="btn-desc">Browse live lobbies, all 24 maps &amp; custom match rules</span>
+            </span>
+            <span class="btn-badge" id="btnOnlineBadge">16 Lobbies →</span>
+          </button>
+
+          <button id="btnStart" class="secondary hero-btn">
+            <span class="btn-left">
+              <span class="btn-title">Single Player</span>
+              <span class="btn-desc">Campaign, Galactic Conquest &amp; Instant Action</span>
+            </span>
+            <span class="btn-badge">Launch →</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Multiplayer Lobby Browser View -->
+      <div id="lobbyView">
+        <div class="lobby-header">
+          <div class="lobby-header-left">
+            <button id="btnBackMain" style="padding:5px 11px;">← Back</button>
+            <h2>Multiplayer Lobbies</h2>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span class="online-pill"><i class="online-dot"></i><span id="onlineCountBadge">0 Players Online</span></span>
+            <button id="btnRefreshRooms" style="padding:5px 10px; font-size:12px;">Refresh</button>
+            <button id="btnOpenCreate" class="primary" style="padding:6px 13px; font-size:12px;">+ Create Custom Lobby</button>
+          </div>
+        </div>
+
+        <div class="lobby-toolbar">
+          <div class="filter-tabs" id="lobbyFilterTabs">
+            <button class="filter-tab active" data-filter="all">All</button>
+            <button class="filter-tab" data-filter="live">Live Only</button>
+            <button class="filter-tab" data-filter="con">Conquest</button>
+            <button class="filter-tab" data-filter="eli">Hero Assault</button>
+            <button class="filter-tab" data-filter="space">Space</button>
+            <button class="filter-tab" data-filter="ctf">CTF</button>
+            <button class="filter-tab" data-filter="hunt_xl">Hunt &amp; XL</button>
+          </div>
+          <input id="inpLobbySearch" class="lobby-search" placeholder="Search maps or lobbies…">
+        </div>
+
+        <div id="roomList" class="room-list"></div>
+      </div>
+
+      <!-- Full Custom Lobby Creator View -->
+      <div id="createLobbyView">
+        <div class="lobby-header">
+          <div class="lobby-header-left">
+            <button id="btnBackLobbies" style="padding:5px 11px;">← Lobbies</button>
+            <h2>Create Custom Lobby</h2>
+          </div>
+          <span class="mono" style="font-size:11px; color:var(--dim);">All 24 retail maps · Full SWBF2 rules</span>
+        </div>
+
+        <div class="creator-grid">
+          <!-- Identity & Password -->
+          <div class="creator-section full">
+            <h3>Lobby Identity</h3>
+            <div class="field-grid">
+              <div class="field">
+                <label for="inpRoom">Lobby Name</label>
+                <input id="inpRoom" value="" placeholder="e.g. Friday Night Conquest" maxlength="40">
+              </div>
+              <div class="field">
+                <label for="inpRoomPassword">Password (Optional)</label>
+                <input id="inpRoomPassword" type="password" value="" placeholder="Leave blank for open lobby" maxlength="32">
+              </div>
+            </div>
+          </div>
+
+          <!-- Map & Playlist Builder -->
+          <div class="creator-section full">
+            <h3>Map &amp; Playlist Rotation (All 24 Maps · 82 Mode Variants)</h3>
+            <div class="field-grid cols3">
+              <div class="field">
+                <label for="selEraFilter">Era Filter</label>
+                <select id="selEraFilter">
+                  <option value="all">All Eras</option>
+                  <option value="gcw">Galactic Civil War (Rebels vs Empire)</option>
+                  <option value="cw">Clone Wars (Republic vs CIS)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selModeFilter">Game Mode Filter</label>
+                <select id="selModeFilter">
+                  <option value="all">All Modes</option>
+                  <option value="con">Conquest</option>
+                  <option value="eli">Hero Assault</option>
+                  <option value="ass">Space Assault</option>
+                  <option value="ctf">2-Flag CTF</option>
+                  <option value="1flag">1-Flag CTF</option>
+                  <option value="hunt">Hunt</option>
+                  <option value="xl">XL Massive Battle</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selMpMap">Select Map &amp; Mode</label>
+                <select id="selMpMap"></select>
+              </div>
+            </div>
+            <div class="row-inline" style="justify-content:space-between;">
+              <div class="row-inline">
+                <button id="btnAddMap" type="button" class="accent" style="padding:5px 11px; font-size:12px;">+ Add to Playlist</button>
+                <button id="btnAddAllMatching" type="button" style="padding:5px 11px; font-size:12px;">+ Add All Matching</button>
+                <button id="btnClearPlaylist" type="button" class="danger" style="padding:5px 11px; font-size:12px;">Clear Playlist</button>
+              </div>
+              <label class="check-item"><input type="checkbox" id="chkRandomize"> Shuffle Playlist Order</label>
+            </div>
+            <div id="playlistChips" class="playlist-chips"></div>
+          </div>
+
+          <!-- Players, AI & Tickets -->
+          <div class="creator-section">
+            <h3>Players, Bots &amp; Limits</h3>
+            <div class="field-grid">
+              <div class="field">
+                <label for="selMaxPlayers">Max Players</label>
+                <select id="selMaxPlayers">
+                  <option value="2">2 Players</option>
+                  <option value="4">4 Players</option>
+                  <option value="8">8 Players</option>
+                  <option value="12">12 Players</option>
+                  <option value="16" selected>16 Players</option>
+                  <option value="24">24 Players</option>
+                  <option value="32">32 Players</option>
+                  <option value="48">48 Players</option>
+                  <option value="64">64 Players</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selNumBots">AI Bots / Team</label>
+                <select id="selNumBots">
+                  <option value="0">0 (Humans Only)</option>
+                  <option value="4">4 Bots</option>
+                  <option value="8">8 Bots</option>
+                  <option value="12">12 Bots</option>
+                  <option value="16" selected>16 Bots (Default)</option>
+                  <option value="20">20 Bots</option>
+                  <option value="24">24 Bots</option>
+                  <option value="32">32 Bots (Max)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selDifficulty">AI Difficulty</label>
+                <select id="selDifficulty">
+                  <option value="1">Easy</option>
+                  <option value="2" selected>Normal</option>
+                  <option value="3">Elite</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selReinfMult">Reinforcements</label>
+                <select id="selReinfMult">
+                  <option value="50">50% (Short)</option>
+                  <option value="75">75%</option>
+                  <option value="100" selected>100% (Standard)</option>
+                  <option value="150">150%</option>
+                  <option value="200">200% (Long)</option>
+                  <option value="300">300% (Epic)</option>
+                  <option value="500">500% (Marathon)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selTimeLimit">Match Time Limit</label>
+                <select id="selTimeLimit">
+                  <option value="0" selected>Unlimited</option>
+                  <option value="5">5 Minutes</option>
+                  <option value="10">10 Minutes</option>
+                  <option value="15">15 Minutes</option>
+                  <option value="20">20 Minutes</option>
+                  <option value="30">30 Minutes</option>
+                  <option value="45">45 Minutes</option>
+                  <option value="60">60 Minutes</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selWarmUp">Pre-Game Warmup</label>
+                <select id="selWarmUp">
+                  <option value="0" selected>None (0s)</option>
+                  <option value="5">5 Seconds</option>
+                  <option value="15">15 Seconds</option>
+                  <option value="30">30 Seconds</option>
+                  <option value="45">45 Seconds</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selCtfScore">CTF Flag Cap Limit</label>
+                <select id="selCtfScore">
+                  <option value="1">1 Flag</option>
+                  <option value="3">3 Flags</option>
+                  <option value="5" selected>5 Flags</option>
+                  <option value="7">7 Flags</option>
+                  <option value="10">10 Flags</option>
+                  <option value="15">15 Flags</option>
+                  <option value="25">25 Flags</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selAssScore">Space Assault Limit</label>
+                <select id="selAssScore">
+                  <option value="60">60 Points</option>
+                  <option value="120">120 Points</option>
+                  <option value="180" selected>180 Points</option>
+                  <option value="240">240 Points</option>
+                  <option value="360">360 Points</option>
+                  <option value="500">500 Points</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selHuntScore">Hunt Score Limit</label>
+                <select id="selHuntScore">
+                  <option value="20">20 Points</option>
+                  <option value="50" selected>50 Points</option>
+                  <option value="75">75 Points</option>
+                  <option value="100">100 Points</option>
+                  <option value="150">150 Points</option>
+                  <option value="200">200 Points</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selSpawnInvinc">Spawn Invincibility</label>
+                <select id="selSpawnInvinc">
+                  <option value="0">Off (0s)</option>
+                  <option value="2" selected>2 Seconds</option>
+                  <option value="4">4 Seconds</option>
+                  <option value="6">6 Seconds</option>
+                  <option value="10">10 Seconds</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hero Rules & Gameplay Toggles -->
+          <div class="creator-section">
+            <h3>Hero Rules &amp; Gameplay Options</h3>
+            <div class="check-grid" style="margin-bottom:4px;">
+              <label class="check-item"><input type="checkbox" id="chkHeroes" checked> Heroes Enabled</label>
+              <label class="check-item"><input type="checkbox" id="chkTeamDamage"> Friendly Fire</label>
+              <label class="check-item"><input type="checkbox" id="chkAutoAssign"> Auto-Assign Teams</label>
+              <label class="check-item"><input type="checkbox" id="chkShowNames" checked> Show Player Names</label>
+              <label class="check-item"><input type="checkbox" id="chkAutoAim"> Auto-Aim Assist</label>
+              <label class="check-item"><input type="checkbox" id="chkAwards" checked> Award Weapons</label>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label for="selHeroUnlock">Hero Unlock Trigger</label>
+                <select id="selHeroUnlock">
+                  <option value="5" selected>By Points</option>
+                  <option value="3">By Timer (Seconds)</option>
+                  <option value="7">Instant / Scripted</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="inpHeroUnlockVal">Unlock Threshold</label>
+                <input id="inpHeroUnlockVal" type="number" min="0" max="200" value="10">
+              </div>
+              <div class="field">
+                <label for="selHeroPlayer">Hero Awarded To</label>
+                <select id="selHeroPlayer">
+                  <option value="1" selected>Best Player (Points)</option>
+                  <option value="2">Most Kills</option>
+                  <option value="7">Random Player</option>
+                  <option value="4">Worst Player</option>
+                  <option value="8">Hero Slayer</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="selHeroTeam">Teams With Hero</label>
+                <select id="selHeroTeam">
+                  <option value="3" selected>Both Teams</option>
+                  <option value="1">One Team</option>
+                  <option value="4">Cycle Teams</option>
+                </select>
+              </div>
+              <div class="field" style="grid-column: 1 / -1;">
+                <label for="selHeroRespawn">Hero Respawn Cooldown</label>
+                <select id="selHeroRespawn">
+                  <option value="0">Immediate (0s)</option>
+                  <option value="30">30 Seconds</option>
+                  <option value="60" selected>60 Seconds</option>
+                  <option value="120">120 Seconds</option>
+                  <option value="-1">Never Respawn</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="creator-actions">
+          <button id="btnHostLaunchNow" type="button" class="secondary">Create &amp; Start Immediately</button>
+          <button id="btnHostLaunch" type="button" class="primary" style="padding:9px 20px;">Create &amp; Open Lobby →</button>
+        </div>
+      </div>
+
+      <div id="errMsg"></div>
+
+      <div class="card-footer">
+        <span class="status-ready">
+          <i class="online-dot" id="readyDot"></i>
+          <span id="readyText">Checking browser capabilities…</span>
+        </span>
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <a href="/" class="link-btn" style="text-decoration:none;">Home</a>
+          <a id="portalDiscordLink" href="#" target="_blank" rel="noopener noreferrer" class="link-btn" style="display:none; color:var(--cyan); text-decoration:none;">Discord</a>
+          <a id="portalGithubLink" href="#" target="_blank" rel="noopener noreferrer" class="link-btn" style="display:none; text-decoration:none;">GitHub</a>
+          <button id="btnToggleAdv" class="link-btn">Settings</button>
+        </div>
+      </div>
+
+      <!-- Collapsible Settings / Storage / Preflight Details -->
+      <div id="advPanel">
+        <div class="row-inline" style="margin-bottom:8px;">
+          <label for="selInitRes" style="color:var(--dim);">Resolution</label>
+          <select id="selInitRes" style="flex:1;">
+            <option value="800x600">800 × 600 (4:3 Classic)</option>
+            <option value="1024x768">1024 × 768 (4:3 High)</option>
+            <option value="1280x720">1280 × 720 (HD 16:9)</option>
+            <option value="1600x900" selected>1600 × 900 (HD+ 16:9)</option>
+            <option value="1920x1080">1920 × 1080 (Full HD 16:9)</option>
+            <option value="2560x1440">2560 × 1440 (QHD 16:9)</option>
+          </select>
+        </div>
+        <div class="row-inline" style="margin-bottom:8px;">
+          <label class="check-item">
+            <input type="checkbox" id="chkMusicInit">
+            <span>Stream Music (off by default to save bandwidth; SFX &amp; voiceovers stay on)</span>
+          </label>
+        </div>
+        <div class="row-inline" style="justify-content:space-between; margin-bottom:8px;">
+          <span class="mono" style="font-size:11px; color:var(--dim);" id="pfCacheInfo">—</span>
+          <div class="row-inline">
+            <button id="btnLauncherExport" style="padding:4px 9px; font-size:11px;">Export Saves</button>
+            <button id="btnLauncherImport" style="padding:4px 9px; font-size:11px;">Import Saves</button>
+            <input id="fileLauncherImportSaves" type="file" accept=".json,.profile,.gc,.rote,.sav" multiple style="display:none;">
+            <button id="btnLauncherClear" class="danger" style="padding:4px 9px; font-size:11px;">Clear Cache</button>
+          </div>
+        </div>
+        <div id="saveLauncherStatus" class="mono" style="font-size:11px; color:var(--ok); margin-bottom:6px; display:none;"></div>
+        <div class="mono" style="font-size:11px; color:var(--dim); display:flex; flex-wrap:wrap; gap:10px;">
+          <span>GPU: <b id="pfGpu">…</b></span>
+          <span>COI: <b id="pfCoi">…</b></span>
+          <span>OPFS: <b id="pfOpfs">…</b></span>
+          <span>Audio: <b id="pfAudio">…</b></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Folder Access Troubleshooting / Compatibility & Forced Mode Modal -->
+  <div id="byocHelpModal" role="dialog" aria-modal="true" aria-labelledby="byocHelpTitle">
+    <div class="byoc-modal-box">
+      <div class="byoc-modal-head">
+        <span id="byocHelpTitle">Opening a folder from this page</span>
+        <button id="btnByocHelpCloseX" type="button" style="padding:2px 9px; font-size:12px;">✕</button>
+      </div>
+      <div class="byoc-modal-body">
+        <p id="byocHelpLead">Folder access is available in this browser. If the button still does nothing:</p>
+        <ul>
+          <li>Allow the prompt the browser shows after you pick the folder ("View files" / "Edit files").</li>
+          <li>Pick the game's own folder, not a system folder such as Program Files itself, your user folder or a whole drive: browsers refuse those.</li>
+          <li>If the browser says it “can't open this folder because it contains system files”, the game is installed in a protected place (Steam puts it under Program Files). Use <a id="btnByocCompatMode" class="inline-mode-link" href="#">compatibility mode</a> instead: it works there, but the browser does not remember the folder, so you choose it again each time you launch.</li>
+          <li>If you blocked it before: click the icon left of the address, open the site settings and reset the file permissions.</li>
+        </ul>
+        <div class="byoc-modal-foot">
+          <a id="btnDevToggle" href="#" style="font-size:11px; color:rgba(154,176,198,0.55); text-decoration:none;">Developer</a>
+          <button id="btnByocHelpClose" type="button">Close</button>
+        </div>
+        <form id="devUnlockBox" class="dev-unlock-box" autocomplete="off">
+          <div style="font-size:11px; color:var(--dim); margin-bottom:6px;">Developer testing session unlock (server-verified cookie):</div>
+          <div class="dev-unlock-row">
+            <input id="inpDevPassword" type="password" placeholder="Enter developer password" autocomplete="off">
+            <button id="btnDevUnlock" type="submit" class="accent" style="padding:6px 13px; font-size:12px;">Unlock</button>
+          </div>
+          <div id="devUnlockMsg"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="/browser/play.mjs"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SWBF2 WebGPU Phase 0 Smoke Test</title>
+<style>
+  body { background: #10141c; color: #e2e8f0; font-family: monospace; margin: 24px; }
+  canvas { border: 1px solid #334155; display: block; margin-bottom: 16px; }
+  pre { background: #0b0f17; padding: 12px; border: 1px solid #1e293b; overflow-x: auto; }
+</style>
+</head>
+<body>
+<h3>SWBF2 Phase 0 WebGPU Smoke (Dedicated Worker + OffscreenCanvas + emdawnwebgpu)</h3>
+<canvas id="canvas" width="256" height="256"></canvas>
+<pre id="out">Running...</pre>
+<script type="module">
+const out = document.getElementById('out');
+const canvas = document.getElementById('canvas');
+const offscreen = canvas.transferControlToOffscreen();
+const worker = new Worker('./webgpu_smoke_worker.mjs', { type: 'module' });
+worker.onmessage = (ev) => {
+  window.__wgpuSmokeResult = ev.data;
+  out.textContent = JSON.stringify(ev.data, null, 2);
+};
+worker.onerror = (err) => {
+  const res = { ok: false, error: err.message || String(err) };
+  window.__wgpuSmokeResult = res;
+  out.textContent = JSON.stringify(res, null, 2);
+};
+worker.postMessage({ canvas: offscreen, width: canvas.width, height: canvas.height }, [offscreen]);
+</script>
+</body>
+</html>

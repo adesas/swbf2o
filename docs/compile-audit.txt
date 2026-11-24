@@ -1,0 +1,62 @@
+ZlibFL         ok:   9 fail:   0
+--- top error kinds in ZlibFL ---
+missing headers in ZlibFL:
+LuaFL          ok:   0 fail:  26
+--- top error kinds in LuaFL ---
+     26 'lua.h' file not found
+missing headers in LuaFL:
+     26 fatal error: 'lua.h' file not found
+PebbleFL       ok:  19 fail:   3
+--- top error kinds in PebbleFL ---
+      8 first argument to 'va_arg' is of type 'char *' and not 'va_list'
+      2 use of undeclared identifier '_snprintf'; did you mean 'vsnprintf'?
+      2 no matching function for call to 'uvsnprintf'
+      1 cannot initialize a parameter of type '__isoc_va_list' (aka 'void *') with an lvalue of type 'int'
+      1 cannot initialize a parameter of type '__isoc_va_list' (aka 'void *') with an lvalue of type 'float'
+missing headers in PebbleFL:
+Zephyr         ok:   7 fail:   5
+--- top error kinds in Zephyr ---
+      8 member access into incomplete type 'ZephyrSkeletonShared'
+missing headers in Zephyr:
+SoundFL        ok:  28 fail:  52
+--- top error kinds in SoundFL ---
+     84 'operator new' takes type size_t ('unsigned long') as 1st parameter
+     21 use of undeclared identifier '_wassert'
+     13 too many errors emitted, stopping now [-ferror-limit=]
+     11 cannot initialize object parameter of type 'Snd::Source' with an expression of type 'Snd::DSBufferRenderer'
+     11 cannot initialize object parameter of type 'Snd::Source2D' with an expression of type 'Snd::DSBufferRenderer'
+     10 static_cast from 'Snd::VoiceVirtualBus *' to 'Source2D3D *', which are not related by inheritance, is not allowed
+missing headers in SoundFL:
+      2 fatal error: 'objbase.h' file not found
+RedEngineFL    ok:  32 fail:  85
+--- top error kinds in RedEngineFL ---
+    132 'operator new' takes type size_t ('unsigned long') as 1st parameter
+     56 no member named 'SetPixelShaderConstantF' in 'IDirect3DDevice9'
+     36 'operator new[]' takes type size_t ('unsigned long') as 1st parameter
+      6 no member named 'SetMaterial' in 'IDirect3DDevice9'
+      6 member access into incomplete type 'ZephyrSkeletonShared'
+      5 no member named 'GetTransform' in 'IDirect3DDevice9'
+missing headers in RedEngineFL:
+      1 fatal error: 'd3dx9.h' file not found
+Battlefront2   ok:  82 fail: 384
+--- top error kinds in Battlefront2 ---
+   2235 'operator new' takes type size_t ('unsigned long') as 1st parameter
+    394 static_cast from 'Snd::VoiceVirtualBus *' to 'Source2D3D *', which are not related by inheritance, is not allowed
+    197 cannot initialize object parameter of type 'const Snd::SourceBus' with an expression of type 'const Snd::VoiceVirtualBus'
+    181 ISO C++ forbids forward references to 'enum' types
+    164 static_cast from 'Snd::StreamBase *' to 'SourceTransport *', which are not related by inheritance, is not allowed
+    164 static_cast from 'Snd::StreamBase *' to 'Source2D3D *', which are not related by inheritance, is not allowed
+missing headers in Battlefront2:
+Steam          ok:   1 fail:   1
+--- top error kinds in Steam ---
+      1 call to 'strlcpy' is ambiguous
+missing headers in Steam:
+lglcd          ok:   0 fail:   1
+--- top error kinds in lglcd ---
+      5 use of undeclared identifier 'ERROR_SERVICE_NOT_ACTIVE'
+      2 use of undeclared identifier 'ERROR_SUCCESS'
+      2 use of undeclared identifier 'ERROR_ALREADY_INITIALIZED'
+      1 use of undeclared identifier 'RPC_S_SERVER_UNAVAILABLE'
+      1 use of undeclared identifier 'RegQueryValueExA'
+      1 use of undeclared identifier 'RegCloseKey'
+missing headers in lglcd:

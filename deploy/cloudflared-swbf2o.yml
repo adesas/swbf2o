@@ -1,0 +1,20 @@
+# Add these two ingress rules ABOVE the final `service: http_status:404` catch-all
+# in your /etc/cloudflared/config.yml, then route DNS and reload cloudflared:
+#
+#   cloudflared tunnel route dns <YOUR_TUNNEL_NAME> swbf2o.com
+#   cloudflared tunnel route dns <YOUR_TUNNEL_NAME> www.swbf2o.com
+#   sudo systemctl restart cloudflared
+#
+# IMPORTANT in Cloudflare Dashboard for swbf2o.com:
+#   - SSL/TLS -> Overview: Full (or Flexible; Full recommended)
+#   - Network -> WebSockets: ON (enabled by default)
+#   - Caching -> Cache Rules: Bypass cache for /api/* and /ws*, allow byte-range caching on /GameData/*
+#   - Do NOT strip Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy headers!
+
+ingress:
+  - hostname: swbf2o.com
+    service: http://127.0.0.1:8123
+  - hostname: www.swbf2o.com
+    service: http://127.0.0.1:8123
+  # ... your existing hostnames ...
+  - service: http_status:404

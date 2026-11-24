@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SWBF2 Phase 4 Native GameState (Shell &lt;-&gt; Mission) Check</title>
+  <style>
+    body { background: #111; color: #ddd; font-family: monospace; margin: 16px; }
+    canvas { border: 1px solid #444; display: block; margin-bottom: 12px; }
+    pre { white-space: pre-wrap; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <canvas id="gpu-canvas" width="800" height="600"></canvas>
+  <pre id="out">Running Phase 4 Native GameState check...</pre>
+  <script type="module">
+    const out = document.getElementById('out');
+    const canvas = document.getElementById('gpu-canvas');
+
+    function rgbaToPngDataUrl(buf, w, h) {
+      if (!buf) return null;
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d');
+      const img = new ImageData(new Uint8ClampedArray(buf), w, h);
+      ctx.putImageData(img, 0, 0);
+      return c.toDataURL('image/png');
+    }
+
+    async function run() {
+      try {
+        const offscreen = canvas.transferControlToOffscreen();
+        const worker = new Worker('/browser/worker.mjs', { type: 'module' });
+        const result = await new Promise((resolve, reject) => {
+          worker.onerror = (e) => reject(new Error(e.message || 'worker error'));
+          worker.onmessage = (ev) => {
+            if (ev.data && ev.data.type === 'log') {
+              console.log(ev.data.text);
+              return;
+            }
+            resolve(ev.data);
+          };
+          worker.postMessage(
+            { id: 1, cmd: 'runPhase4GameStateCheck', opts: { canvas: offscreen, width: 800, height: 600, closeHandlesOnExit: true, debugClearColour: (() => {
+                      const c = new URLSearchParams(location.search).get('clear');
+                      return c ? c.split(',').map(Number) : null;
+                    })(), debugPsMode: Number(new URLSearchParams(location.search).get('ps') || 0), debugSkipDraws: (() => {
+                      const s = new URLSearchParams(location.search).get('skip');
+                      return s ? s.split('-').map(Number) : null;
+                    })(), debugRecordDraws: new URLSearchParams(location.search).has('record'), debugRecordRange: (() => {
+                      const r = new URLSearchParams(location.search).get('ids');
+                      return r ? r.split('-').map(Number) : null;
+                    })() } },
+            [offscreen]
+          );
+        });
+        worker.terminate();
+
+        // Spawn a fresh second worker to verify OPFS /saves/savegames/ profile persistence across reload.
+        const worker2 = new Worker('/browser/worker.mjs', { type: 'module' });
+        const persist = await new Promise((resolve, reject) => {
+          worker2.onerror = (e) => reject(new Error(e.message || 'worker2 error'));
+          worker2.onmessage = (ev) => {
+            if (ev.data && ev.data.type === 'log') return;
+            resolve(ev.data);
+          };
+          worker2.postMessage({ id: 2, cmd: 'checkOpfsSaves', opts: { prefix: '/saves/savegames/', closeHandlesOnExit: true } });
+        });
+        worker2.terminate();
+
+        window.__phase4PngShell = rgbaToPngDataUrl(result.pixelsShell, result.width, result.height);
+        window.__phase4PngMain = rgbaToPngDataUrl(result.pixelsMain, result.width, result.height);
+        window.__phase4PngTat = rgbaToPngDataUrl(result.pixelsTat, result.width, result.height);
+        window.__phase4PngEli = rgbaToPngDataUrl(result.pixelsEli, result.width, result.height);
+        window.__phase4PngSpa = rgbaToPngDataUrl(result.pixelsSpa, result.width, result.height);
+        delete result.pixelsShell;
+        delete result.pixelsMain;
+        delete result.pixelsTat;
+        delete result.pixelsEli;
+        delete result.pixelsSpa;
+        result.persistedProfilesAfterReload = persist.saves || [];
+        result.crossOriginIsolated = self.crossOriginIsolated;
+        window.__phase4Result = result;
+        out.textContent = JSON.stringify(result, null, 2);
+      } catch (err) {
+        const r = { ok: false, error: String(err && err.stack ? err.stack : err) };
+        window.__phase4Result = r;
+        out.textContent = JSON.stringify(r, null, 2);
+      }
+    }
+    run();
+  </script>
+</body>
+</html>

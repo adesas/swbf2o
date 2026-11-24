@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SWBF2 Phase 1 OPFS Streaming VFS Check</title>
+<style>
+  body { background: #0f172a; color: #e2e8f0; font-family: monospace; margin: 20px; }
+  pre { background: #020617; padding: 12px; border: 1px solid #334155; overflow-x: auto; font-size: 12px; }
+</style>
+</head>
+<body>
+<h3>SWBF2 Phase 1: Dedicated Worker + OPFS On-Demand GameData Streaming VFS</h3>
+<pre id="out">Running cold + warm OPFS streaming verification...</pre>
+<script type="module">
+const out = document.getElementById('out');
+
+function runWorkerOnce(opts) {
+  return new Promise((resolve, reject) => {
+    const w = new Worker('./worker.mjs', { type: 'module' });
+    w.onmessage = (ev) => {
+      w.terminate();
+      resolve(ev.data);
+    };
+    w.onerror = (err) => {
+      w.terminate();
+      reject(new Error(err.message || String(err)));
+    };
+    w.postMessage({ id: 1, cmd: 'runPhase1Check', opts });
+  });
+}
+
+try {
+  const EXPECTED_PCM_SHA = 'ba7b1ad54541c5499556de1ca8c7a30a2adaaedff879a2abb43d3e073e726391';
+  const SAVE_PAYLOAD = 'SWBF2_PROFILE_OPFS_V1_PERSISTENT';
+
+  // Run 1: COLD (fresh OPFS cache cleared, streams on demand from /GameData/ mirror via Range)
+  const cold = await runWorkerOnce({
+    clearCache: true,
+    writeSaveText: SAVE_PAYLOAD,
+    closeHandlesOnExit: true,
+  });
+
+  // Run 2: WARM (brand-new Worker instance, existing OPFS cache -> must transfer ZERO HTTP bytes!)
+  const warm = await runWorkerOnce({
+    clearCache: false,
+    writeSaveText: null,
+    closeHandlesOnExit: true,
+  });
+
+  const repFileCold = cold.vfsStats?.perFile?.['side/rep.lvl'] || null;
+  const bnkFileCold = cold.vfsStats?.perFile?.['sound/common.bnk'] || null;
+
+  const checks = {
+    crossOriginIsolated: window.crossOriginIsolated === true,
+    sharedArrayBufferAvailable: typeof SharedArrayBuffer === 'function',
+    coldOk: cold.ok === true,
+    warmOk: warm.ok === true,
+    opfsPersistent: cold.vfsStats?.opfsPersistent === true && warm.vfsStats?.opfsPersistent === true,
+    zeroMemfsCopies: (cold.memfsEntries?.length === 0) && (warm.memfsEntries?.length === 0),
+    tat2CollisionMeshesExact: cold.collisionMeshes === 37 && warm.collisionMeshes === 37,
+    trooperSpawnedBoth: cold.spawnOk === true && warm.spawnOk === true,
+    audioSha256Exact: cold.audio?.pcmSha256 === EXPECTED_PCM_SHA && warm.audio?.pcmSha256 === EXPECTED_PCM_SHA,
+    coldHttpUnder60MB: (cold.vfsStats?.httpBytes || Infinity) < 60 * 1024 * 1024,
+    sideRepSparseStreamed: !!repFileCold && repFileCold.size > 100e6 && repFileCold.httpBytes < 20e6,
+    soundBankSparseStreamed: !!bnkFileCold && bnkFileCold.size > 70e6 && bnkFileCold.httpBytes < 5e6,
+    warmZeroHttpRequests: warm.vfsStats?.httpRequests === 0 && warm.vfsStats?.httpBytes === 0,
+    warmServedFromOpfs: (warm.vfsStats?.opfsHits || 0) > 0,
+    savePersistedAcrossWorkers: warm.saveReadBack === SAVE_PAYLOAD,
+  };
+
+  const ok = Object.values(checks).every(Boolean);
+  const report = { ok, checks, cold, warm };
+  window.__vfsCheckResult = report;
+  out.textContent = JSON.stringify(report, null, 2);
+} catch (err) {
+  const report = { ok: false, error: String(err && err.stack ? err.stack : err) };
+  window.__vfsCheckResult = report;
+  out.textContent = JSON.stringify(report, null, 2);
+}
+</script>
+</body>
+</html>

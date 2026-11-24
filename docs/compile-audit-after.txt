@@ -1,0 +1,60 @@
+./tools/compile_core.sh: line 33: export: CLANG: not a function
+./tools/compile_core.sh: line 33: export: FLAGS: not a function
+./tools/compile_core.sh: line 33: export: INC: not a function
+./tools/compile_core.sh: line 33: export: OBJ: not a function
+./tools/compile_core.sh: line 33: export: RES: not a function
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory
+environment: line 7: : No such file or directory

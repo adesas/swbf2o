@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SWBF2O — Star Wars Battlefront II (2005) Browser Edition</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Play the classic 2005 Star Wars Battlefront II natively in your web browser at swbf2o.com with WebGPU, 48 kHz 3D audio, up to 64-player WebRTC multiplayer, voice chat, and all 24 maps.">
+<link rel="canonical" href="https://swbf2o.com/">
+<meta property="og:title" content="SWBF2O — Star Wars Battlefront II (2005) Browser Edition">
+<meta property="og:description" content="Classic 2005 Battlefront II running natively in your browser via WebGPU & WebAssembly with all 24 maps, WebRTC multiplayer, and Bring-Your-Own-Copy local GameData.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://swbf2o.com/">
+<meta property="og:image" content="https://swbf2o.com/browser/assets/bg_galactic_conquest.webp">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SWBF2O — Star Wars Battlefront II Online">
+<meta name="twitter:description" content="Classic 2005 Star Wars Battlefront II natively in Chrome/Edge with WebGPU & WebRTC multiplayer.">
+<meta name="twitter:image" content="https://swbf2o.com/browser/assets/bg_galactic_conquest.webp">
+<link rel="icon" type="image/svg+xml" href="/browser/favicon.svg">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #03060c;
+    --panel-bg: rgba(9, 15, 24, 0.86);
+    --panel-bg-solid: #0b121d;
+    --steel-hi: #a9b8c8;
+    --steel-mid: #5a6878;
+    --steel-lo: #232c37;
+    --steel-dark: #090d13;
+    --holo: #66c4ff;
+    --holo-deep: #2a6ea8;
+    --rep-blue: #3b8eea;
+    --imp-red: #d9382e;
+    --gold: #e8b84b;
+    --ink: #e8f0f8;
+    --dim: #9ab0c6;
+    --ok: #46d97e;
+    --font-display: "Eurostile", "Bank Gothic", "Microgramma", "Bahnschrift", "DIN Condensed", "Arial Narrow", "Trebuchet MS", sans-serif;
+    --font-body: "Tahoma", "Verdana", "Segoe UI", Arial, sans-serif;
+    --font-mono: "Lucida Console", ui-monospace, "Consolas", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; overflow-x: hidden; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.55 var(--font-body);
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  a { color: inherit; text-decoration: none; }
+  code, .mono { font-family: var(--font-mono); }
+
+  /* ---- Real In-Game Imperial Star Destroyer + Planet Fixed Space Backdrop ---- */
+  .space-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -3;
+    background:
+      url('/browser/assets/bg_galactic_conquest.webp') center center / cover no-repeat;
+    filter: contrast(1.06) saturate(1.05);
+    transform: scale(1.01);
+  }
+  .space-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, rgba(3, 6, 12, 0.20) 0%, rgba(3, 6, 12, 0.14) 50%, rgba(3, 6, 12, 0.72) 100%),
+      linear-gradient(180deg, rgba(2, 5, 10, 0.65) 0%, rgba(2, 5, 10, 0.10) 26%, rgba(2, 5, 10, 0.22) 72%, rgba(2, 5, 10, 0.88) 100%);
+  }
+  .holo-scanlines {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(120, 195, 255, 0.032) 0px,
+      rgba(120, 195, 255, 0.032) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  }
+
+  .container { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+
+  /* ---- Authentic 2005 SWBF2 Brushed-Steel Beveled Panel (matches loadtipsbox_pieces) ---- */
+  .bf-panel {
+    position: relative;
+    background: var(--panel-bg);
+    border: 2px solid var(--steel-mid);
+    outline: 1px solid var(--steel-dark);
+    border-radius: 3px;
+    box-shadow:
+      inset 0 1px 0 rgba(215, 232, 248, 0.42),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.85),
+      inset 1px 0 0 rgba(190, 210, 230, 0.18),
+      inset -1px 0 0 rgba(0, 0, 0, 0.65),
+      0 14px 36px rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(5px);
+  }
+  .bf-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 14px;
+    background: linear-gradient(180deg, #566475 0%, #333e4c 48%, #202833 52%, #394656 100%);
+    border-bottom: 2px solid #121820;
+    box-shadow: inset 0 1px 0 rgba(225, 238, 252, 0.45);
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #eef6ff;
+    text-shadow: 0 1px 2px #000;
+  }
+  .bf-panel-head .code-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--holo);
+    opacity: 0.9;
+  }
+  .bf-panel-body { padding: 18px 20px; }
+
+  /* ---- Authentic 2005 SWBF2 Metallic Capsule Buttons (matches Select a Team / ifs_main) ---- */
+  .bf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    color: #0b1118;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
+    background: linear-gradient(180deg, #a6b3c0 0%, #7f8c9a 48%, #5e6a77 52%, #7d8a98 100%);
+    border: 2px solid #1a212b;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.65),
+      inset 0 -2px 2px rgba(0, 0, 0, 0.35),
+      0 2px 8px rgba(0, 0, 0, 0.72);
+    transition: filter 0.12s ease, box-shadow 0.14s ease, transform 0.1s ease;
+    white-space: nowrap;
+  }
+  .bf-btn:hover {
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    background: linear-gradient(180deg, #86c8fa 0%, #4389c6 48%, #255b8d 52%, #4a96d4 100%);
+    border-color: #9dd8ff;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.72),
+      0 0 18px rgba(82, 178, 255, 0.55),
+      0 2px 10px rgba(0, 0, 0, 0.8);
+  }
+  .bf-btn:active { transform: translateY(1px); }
+
+  .bf-btn.primary {
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.92);
+    background: linear-gradient(180deg, #7bc0f2 0%, #3d82bd 48%, #235888 52%, #4991cd 100%);
+    border-color: #95d2ff;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.72),
+      0 0 16px rgba(72, 168, 255, 0.42),
+      0 3px 10px rgba(0, 0, 0, 0.78);
+  }
+  .bf-btn.primary:hover {
+    background: linear-gradient(180deg, #9dd5ff 0%, #5098d6 48%, #2c6ca6 52%, #5ca8e5 100%);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.85),
+      0 0 24px rgba(102, 196, 255, 0.68),
+      0 3px 12px rgba(0, 0, 0, 0.85);
+  }
+
+  .bf-btn.gold {
+    color: #120d03;
+    text-shadow: 0 1px 0 rgba(255, 240, 190, 0.55);
+    background: linear-gradient(180deg, #f5d377 0%, #d4a135 48%, #a6781b 52%, #d4a135 100%);
+    border-color: #3a2a0b;
+  }
+  .bf-btn.gold:hover {
+    color: #fff;
+    text-shadow: 0 1px 2px #000;
+    background: linear-gradient(180deg, #ffe28c 0%, #e4b242 48%, #bc8921 52%, #e4b242 100%);
+    border-color: #ffe28c;
+    box-shadow: 0 0 18px rgba(232, 184, 75, 0.55), 0 3px 10px rgba(0, 0, 0, 0.8);
+  }
+
+  .bf-btn.dark {
+    color: #cfe4f8;
+    text-shadow: 0 1px 2px #000;
+    background: linear-gradient(180deg, #3c4857 0%, #26303c 48%, #182029 52%, #293442 100%);
+    border-color: #607083;
+  }
+  .bf-btn.dark:hover {
+    color: #fff;
+    background: linear-gradient(180deg, #74b7eb 0%, #3979b0 48%, #22537e 52%, #4489c3 100%);
+    border-color: #9ad6ff;
+  }
+
+  .bf-btn.menu-row {
+    width: 100%;
+    justify-content: space-between;
+    padding: 11px 18px;
+    font-size: 14px;
+  }
+  .bf-btn.menu-row .sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    opacity: 0.86;
+  }
+
+  /* ---- Top LucasArts/Holonet HUD Header Bar ---- */
+  header.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: linear-gradient(180deg, rgba(28, 37, 49, 0.96) 0%, rgba(12, 18, 27, 0.96) 52%, rgba(7, 11, 18, 0.97) 100%);
+    border-bottom: 2px solid #596879;
+    box-shadow: inset 0 1px 0 rgba(210, 228, 245, 0.35), 0 6px 22px rgba(0, 0, 0, 0.85);
+  }
+  .topbar-inner {
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+  }
+  .brand-mark {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 13px;
+    color: #eef6ff;
+    text-shadow: 0 1px 3px #000;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .brand-mark img { width: 26px; height: 26px; filter: drop-shadow(0 0 6px rgba(102, 196, 255, 0.45)); }
+  .brand-mark .accent { color: var(--holo); }
+
+  .top-links {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #a9bed2;
+  }
+  .top-links a:hover { color: var(--holo); text-shadow: 0 0 8px rgba(102, 196, 255, 0.5); }
+  @media (max-width: 960px) { .top-links { display: none; } }
+
+  .top-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  @media (max-width: 720px) {
+    .container { padding: 0 14px; }
+    .topbar-inner { height: 54px; gap: 8px; }
+    #navDiscordBtn, #navGithubBtn { display: none !important; }
+    .brand-mark { font-size: 12px; letter-spacing: 0.09em; gap: 7px; }
+    .brand-mark img { width: 22px; height: 22px; }
+    .top-actions { gap: 6px; }
+  }
+  @media (max-width: 440px) {
+    .brand-mark .accent { display: none; }
+    .led-readout { padding: 4px 7px; font-size: 10px; gap: 5px; }
+    .top-actions .bf-btn.primary { padding: 6px 11px !important; font-size: 10.5px !important; }
+  }
+  .led-readout {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 10px;
+    background: #060b12;
+    border: 1px solid #485666;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #9be8ff;
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.85);
+    white-space: nowrap;
+  }
+  .led-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #a8ffca, #22c55e 60%, #0f5129);
+    box-shadow: 0 0 8px #22c55e;
+  }
+  .led-dot.red {
+    background: radial-gradient(circle at 35% 35%, #ff9b95, #d9382e 60%, #5e100b);
+    box-shadow: 0 0 8px #d9382e;
+  }
+
+  /* ---- Hero: Live WebGPU Capture + Galactic Status on left, SWBF2 Command Menu on right ---- */
+  .hero {
+    min-height: calc(100vh - 58px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 32px 0 34px;
+  }
+  .hero-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 448px);
+    gap: 28px;
+    align-items: center;
+  }
+  @media (max-width: 920px) {
+    .hero { min-height: auto; padding: 20px 0 24px; }
+    .hero-stage { grid-template-columns: 1fr; align-items: stretch; gap: 18px; }
+    .menu-console { order: -1; }
+  }
+
+  .menu-console .bf-panel-body { padding: 22px 22px 20px; }
+  @media (max-width: 480px) {
+    .menu-console .bf-panel-body { padding: 18px 16px 16px; }
+  }
+  .sw-kicker {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.30em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 4px;
+    text-shadow: 0 1px 3px #000;
+  }
+  .sw-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(24px, 6.8vw, 37px);
+    line-height: 1.05;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: linear-gradient(180deg, #ffffff 0%, #d2e4f7 52%, #7d96b0 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.95));
+  }
+  .sw-subtitle {
+    margin: 6px 0 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(130, 165, 200, 0.28);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--holo);
+  }
+  .sw-brief {
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: #c8d9ea;
+    line-height: 1.55;
+  }
+  .menu-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin-bottom: 14px;
+  }
+  .menu-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .console-foot-note {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(130, 165, 200, 0.22);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: #93acc4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Left-side live WebGPU engine capture frame + galactic reinforcement telemetry */
+  .vista-hud {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 14px;
+    min-width: 0;
+  }
+  .hero-capture {
+    overflow: hidden;
+  }
+  .hero-capture-img {
+    position: relative;
+    background: #02050a;
+    border-bottom: 2px solid #293442;
+  }
+  .hero-capture-img img {
+    width: 100%;
+    height: auto;
+    display: block;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+  }
+  .hero-capture-img::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(120, 200, 255, 0.035) 0 1px, transparent 1px 3px);
+  }
+  .hero-capture-bar {
+    padding: 9px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: linear-gradient(180deg, #1b2532 0%, #0d131c 100%);
+    font-size: 12px;
+    color: #c8d9ea;
+  }
+  .hero-capture-bar strong {
+    font-family: var(--font-display);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #eef6ff;
+  }
+  .hero-capture-bar .cap-pill {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--holo);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .reinforcement-bar {
+    width: 100%;
+    background: rgba(6, 11, 19, 0.86);
+    border: 2px solid var(--steel-mid);
+    outline: 1px solid #080c12;
+    border-radius: 3px;
+    padding: 12px 15px;
+    box-shadow: inset 0 1px 0 rgba(210, 228, 245, 0.35), 0 10px 30px rgba(0, 0, 0, 0.8);
+  }
+  .reinf-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+  .reinf-blue { color: #6bc4ff; }
+  .reinf-red { color: #ff6e66; }
+  .reinf-track {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    height: 8px;
+    background: #04070c;
+    border: 1px solid #414e5d;
+    padding: 1px;
+    margin-bottom: 10px;
+  }
+  .reinf-track .bar-l { background: linear-gradient(90deg, #1d5794, #5dc0ff); }
+  .reinf-track .bar-r { background: linear-gradient(90deg, #ff5e52, #8e1812); }
+  .telemetry-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    text-align: center;
+  }
+  .tel-cell {
+    background: rgba(3, 7, 13, 0.8);
+    border: 1px solid rgba(110, 140, 170, 0.28);
+    padding: 6px 4px;
+  }
+  .tel-val {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+  }
+  .tel-val.ok { color: var(--ok); }
+  .tel-val.gold { color: var(--gold); }
+  .tel-val.holo { color: var(--holo); }
+  .tel-lbl {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-top: 2px;
+  }
+
+  /* ---- Sections ---- */
+  section.block { padding: 34px 0; }
+  .sec-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid rgba(110, 142, 174, 0.42);
+  }
+  .sec-banner h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #eef6ff;
+    text-shadow: 0 2px 6px #000;
+  }
+  .sec-banner .sec-sub {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--holo);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ---- Sector Visual Gallery (Real In-Game Assets in Steel Monitor Bezels) ---- */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 940px) { .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .gallery-grid { grid-template-columns: 1fr; } }
+  .monitor-card {
+    background: var(--panel-bg-solid);
+    border: 2px solid var(--steel-mid);
+    outline: 1px solid #070a0f;
+    border-radius: 3px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(215, 232, 248, 0.35), 0 10px 26px rgba(0, 0, 0, 0.8);
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .monitor-card:hover {
+    border-color: var(--holo);
+    transform: translateY(-2px);
+  }
+  .monitor-screen {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: #02050a;
+    border-bottom: 2px solid #293442;
+  }
+  .monitor-screen img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .monitor-screen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(120, 200, 255, 0.04) 0 1px, transparent 1px 3px);
+  }
+  .monitor-cap {
+    padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: linear-gradient(180deg, #1a232f 0%, #0d131c 100%);
+  }
+  .monitor-cap strong {
+    font-family: var(--font-display);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #eef6ff;
+  }
+  .monitor-cap span {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--holo);
+    text-transform: uppercase;
+  }
+
+  /* ---- Briefing Features Grid ---- */
+  .brief-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 780px) { .brief-grid { grid-template-columns: 1fr; } }
+  .brief-card h3 {
+    margin: 0 0 6px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .brief-card p { margin: 0; font-size: 13px; color: #b8cbe0; }
+
+  /* ---- Controls & BYOC Briefing ---- */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 840px) { .two-col { grid-template-columns: 1fr; } }
+  .key-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px 12px;
+  }
+  @media (max-width: 540px) { .key-list { grid-template-columns: 1fr; } }
+  .key-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 9px;
+    background: rgba(4, 8, 14, 0.82);
+    border: 1px solid rgba(110, 140, 170, 0.25);
+    font-size: 12px;
+    color: #cdddf0;
+  }
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    color: #eef7ff;
+    background: linear-gradient(180deg, #4b5868 0%, #242e3a 100%);
+    border: 1px solid #8092a6;
+    border-radius: 2px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    white-space: nowrap;
+  }
+
+  /* ---- Community / Support Holonet Box ---- */
+  .comms-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .comms-copy { max-width: 620px; }
+  .comms-copy h3 {
+    margin: 0 0 6px;
+    font-family: var(--font-display);
+    font-size: 18px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .comms-copy p { margin: 0; font-size: 13px; color: #bed0e4; }
+  .comms-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  /* ---- FAQ ---- */
+  .faq-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 780px) { .faq-grid { grid-template-columns: 1fr; } }
+  .faq-card h4 {
+    margin: 0 0 6px;
+    font-family: var(--font-display);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--holo);
+  }
+  .faq-card p { margin: 0; font-size: 13px; color: #bfd0e3; }
+
+  /* ---- Footer ---- */
+  footer {
+    margin-top: 28px;
+    padding: 20px 0 34px;
+    background: linear-gradient(180deg, rgba(14, 21, 31, 0.94) 0%, rgba(5, 9, 15, 0.98) 100%);
+    border-top: 2px solid #556475;
+    font-size: 12px;
+    color: #93a9bf;
+  }
+  .foot-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .foot-links {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .foot-links a:hover { color: var(--holo); }
+  .disclaimer {
+    margin-top: 12px;
+    font-size: 11px;
+    color: rgba(154, 176, 198, 0.72);
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="space-backdrop" aria-hidden="true"></div>
+<div class="space-vignette" aria-hidden="true"></div>
+<div class="holo-scanlines" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a href="/" class="brand-mark">
+      <img src="/browser/favicon.svg" alt="">
+      <span>BATTLEFRONT II <span class="accent">// ONLINE</span></span>
+    </a>
+    <nav class="top-links">
+      <a href="#sectors">Battlefronts</a>
+      <a href="#briefing">Engine</a>
+      <a href="#controls">Controls</a>
+      <a href="#comms">Community</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="top-actions">
+      <a href="/play#lobbies" class="led-readout" title="Live Multiplayer Lobbies">
+        <i class="led-dot"></i>
+        <span id="navOnlineCount">0 ONLINE</span>
+      </a>
+      <a id="navDiscordBtn" href="#" target="_blank" rel="noopener noreferrer" class="bf-btn dark" style="display:none; padding:6px 13px; font-size:11px;">Discord</a>
+      <a id="navGithubBtn" href="#" target="_blank" rel="noopener noreferrer" class="bf-btn dark" style="display:none; padding:6px 13px; font-size:11px;">GitHub</a>
+      <a href="/play" class="bf-btn primary" style="padding:6px 15px; font-size:11px;">Deploy →</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- Hero: Live WebGPU engine capture + galactic status on left, classic 2005 SWBF2 menu on right -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-stage">
+        <div class="vista-hud">
+          <div class="bf-panel hero-capture">
+            <div class="hero-capture-img">
+              <img src="/browser/assets/shot_space_yavin.webp" alt="Space Yavin Starfighter Hangar running live in WebGPU">
+            </div>
+            <div class="hero-capture-bar">
+              <div><strong>Live WebGPU Engine Capture</strong> · Space Yavin Hangar</div>
+              <span class="cap-pill">60 FPS · Native BCn</span>
+            </div>
+          </div>
+
+          <div class="reinforcement-bar">
+            <div class="reinf-top">
+              <span class="reinf-blue">REPUBLIC / REBELS</span>
+              <span style="color:#d6e6f7;">GALACTIC STATUS</span>
+              <span class="reinf-red">CIS / EMPIRE</span>
+            </div>
+            <div class="reinf-track">
+              <div class="bar-l"></div>
+              <div class="bar-r"></div>
+            </div>
+            <div class="telemetry-grid">
+              <div class="tel-cell">
+                <div class="tel-val ok" id="statPlayers">0</div>
+                <div class="tel-lbl">Online</div>
+              </div>
+              <div class="tel-cell">
+                <div class="tel-val holo" id="statRooms">0</div>
+                <div class="tel-lbl">Lobbies</div>
+              </div>
+              <div class="tel-cell">
+                <div class="tel-val">24</div>
+                <div class="tel-lbl">Planets</div>
+              </div>
+              <div class="tel-cell">
+                <div class="tel-val gold">64</div>
+                <div class="tel-lbl">Max Players</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bf-panel menu-console">
+          <div class="bf-panel-body">
+            <div class="sw-kicker">Star Wars · 2005 Classic</div>
+            <h1 class="sw-title">Battlefront II</h1>
+            <div class="sw-subtitle">Browser Edition · WebAssembly &amp; WebRTC</div>
+            <p class="sw-brief">
+              Command the 501st Legion, pilot starfighters between capital ships, or join 64-player
+              lobbies directly in your browser using your own Steam, GOG, or Disc copy.
+            </p>
+            <div class="menu-stack">
+              <a href="/play#lobbies" class="bf-btn primary menu-row">
+                <span>Play Online</span>
+                <span class="sub">MP LOBBIES →</span>
+              </a>
+              <a href="/play" class="bf-btn menu-row">
+                <span>Single Player</span>
+                <span class="sub">CAMPAIGN / GC / IA →</span>
+              </a>
+              <div class="menu-row-2">
+                <a id="heroDiscordBtn" href="#" target="_blank" rel="noopener noreferrer" class="bf-btn dark" style="display:none; font-size:12px;">Discord</a>
+                <a id="heroGithubBtn" href="#" target="_blank" rel="noopener noreferrer" class="bf-btn dark" style="display:none; font-size:12px;">GitHub</a>
+              </div>
+            </div>
+            <div class="console-foot-note">
+              <span>BRING YOUR OWN COPY · 100% LOCAL</span>
+              <span>CHROME / EDGE / BRAVE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Real In-Game Sectors & Live WebGPU Visual Feed -->
+  <section id="sectors" class="block">
+    <div class="container">
+      <div class="sec-banner">
+        <h2>Galactic Battlefronts</h2>
+        <span class="sec-sub">All 24 Ground &amp; Space Maps · 82 Mode Variants</span>
+      </div>
+      <div class="gallery-grid">
+        <div class="monitor-card">
+          <div class="monitor-screen">
+            <img src="/browser/assets/bg_star_destroyer_bridge.webp" alt="A-Wing flying over an Imperial Star Destroyer bridge" loading="lazy">
+          </div>
+          <div class="monitor-cap">
+            <strong>Imperial Star Destroyer</strong>
+            <span>Space Assault</span>
+          </div>
+        </div>
+        <div class="monitor-card">
+          <div class="monitor-screen">
+            <img src="/browser/assets/shot_coruscant_temple.webp" alt="501st Clone Trooper at Coruscant Jedi Temple" loading="lazy">
+          </div>
+          <div class="monitor-cap">
+            <strong>Coruscant: Jedi Temple</strong>
+            <span>Clone Wars</span>
+          </div>
+        </div>
+        <div class="monitor-card">
+          <div class="monitor-screen">
+            <img src="/browser/assets/shot_hoth_hangar.webp" alt="Echo Base Hangar on Hoth with Snowspeeders and Millennium Falcon" loading="lazy">
+          </div>
+          <div class="monitor-cap">
+            <strong>Hoth: Echo Base</strong>
+            <span>Conquest / XL</span>
+          </div>
+        </div>
+        <div class="monitor-card">
+          <div class="monitor-screen">
+            <img src="/browser/assets/bg_tie_destroyer.webp" alt="TIE Bomber flying past an Imperial Star Destroyer hangar bay" loading="lazy">
+          </div>
+          <div class="monitor-cap">
+            <strong>Space Yavin Hangar Run</strong>
+            <span>Capital Ship Siege</span>
+          </div>
+        </div>
+        <div class="monitor-card">
+          <div class="monitor-screen">
+            <img src="/browser/assets/shot_mustafar_command.webp" alt="Mustafar Separatist Refinery tactical command room" loading="lazy">
+          </div>
+          <div class="monitor-cap">
+            <strong>Mustafar: Refinery</strong>
+            <span>Conquest / CTF</span>
+          </div>
+        </div>
+        <div class="monitor-card">
+          <div class="monitor-screen">
+            <img src="/browser/assets/shot_mos_eisley.webp" alt="Tatooine Mos Eisley live WebGPU browser capture" loading="lazy">
+          </div>
+          <div class="monitor-cap">
+            <strong>Tatooine: Mos Eisley</strong>
+            <span>Live WebGPU Capture</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Engine Briefing -->
+  <section id="briefing" class="block">
+    <div class="container">
+      <div class="sec-banner">
+        <h2>Tactical Engine Briefing</h2>
+        <span class="sec-sub">Native C++ → WebAssembly · Direct3D 9 SM 1.1 → WGSL</span>
+      </div>
+      <div class="brief-grid">
+        <div class="bf-panel brief-card">
+          <div class="bf-panel-head"><span>01 // NATIVE WEBGPU RENDERER</span><span class="code-tag">60 FPS · BCn</span></div>
+          <div class="bf-panel-body">
+            <h3>Authentic 2005 Graphics in Your Tab</h3>
+            <p>Runs the original game simulation, Lua mission scripts, physics, AI, and Direct3D 9 Shader Model 1.1 shaders natively on WebGPU with hardware-compressed BCn textures and classic loading screens.</p>
+          </div>
+        </div>
+        <div class="bf-panel brief-card">
+          <div class="bf-panel-head"><span>02 // WEBRTC MULTIPLAYER &amp; VOICE</span><span class="code-tag">UP TO 64 PLAYERS</span></div>
+          <div class="bf-panel-body">
+            <h3>Public Lobbies, Custom Rules &amp; Hot-Join</h3>
+            <p>Pick a guest callsign and deploy into 16 public lobbies or host custom multi-map playlists with passwords, AI difficulty, ticket multipliers, hero rules, lobby chat, All/Team chat, and WebRTC voice chat.</p>
+          </div>
+        </div>
+        <div class="bf-panel brief-card">
+          <div class="bf-panel-head"><span>03 // BRING YOUR OWN COPY (LOCAL VFS)</span><span class="code-tag">ZERO UPLOADS</span></div>
+          <div class="bf-panel-body">
+            <h3>Reads Straight From Your Steam / GOG / CD Folder</h3>
+            <p>Point the portal at your own legal SWBF2 (2005) <code>GameData</code> folder. Files remain strictly on your device and stream locally in 256 KiB slices via <code>FileReaderSync</code> with one-click reconnect.</p>
+          </div>
+        </div>
+        <div class="bf-panel brief-card">
+          <div class="bf-panel-head"><span>04 // 48 KHZ 3D AUDIO &amp; PORTABLE SAVES</span><span class="code-tag">OPFS + TOUCH</span></div>
+          <div class="bf-panel-body">
+            <h3>Campaign, Galactic Conquest, Gamepad &amp; Mobile</h3>
+            <p>Low-latency 48 kHz AudioWorklet 3D surround sound, Bink cutscenes, Android/iOS touch controls, and persistent browser profiles you can export or import anytime.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Controls & Setup -->
+  <section id="controls" class="block">
+    <div class="container">
+      <div class="sec-banner">
+        <h2>Field Controls &amp; Deployment</h2>
+        <span class="sec-sub">Keyboard · Mouse · Gamepad · Touch</span>
+      </div>
+      <div class="two-col">
+        <div class="bf-panel">
+          <div class="bf-panel-head"><span>COMBAT &amp; COMMS BINDINGS</span><span class="code-tag">PC CLASSIC</span></div>
+          <div class="bf-panel-body">
+            <div class="key-list">
+              <div class="key-row"><span>Move Soldier</span><kbd>W A S D</kbd></div>
+              <div class="key-row"><span>Aim / Fire / Alt</span><kbd>Mouse</kbd></div>
+              <div class="key-row"><span>Jump / Sprint / Crouch</span><kbd>Space / Shift / C</kbd></div>
+              <div class="key-row"><span>Enter Vehicle / Use</span><kbd>E</kbd></div>
+              <div class="key-row"><span>Accept Hero</span><kbd>F1</kbd></div>
+              <div class="key-row"><span>Pause / Respawn</span><kbd>Esc</kbd></div>
+              <div class="key-row"><span>All Chat / Team Chat</span><kbd>T / Y</kbd></div>
+              <div class="key-row"><span>Push-to-Talk Voice</span><kbd>V</kbd></div>
+              <div class="key-row"><span>Scoreboard</span><kbd>Tab</kbd></div>
+              <div class="key-row"><span>FPS &amp; Net HUD</span><kbd>F8</kbd></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bf-panel">
+          <div class="bf-panel-head"><span>DEPLOYMENT CHECKLIST</span><span class="code-tag">TIPS AND TRICKS</span></div>
+          <div class="bf-panel-body">
+            <p style="margin:0 0 10px; font-size:13px; color:#c8d9ea;">
+              <strong style="color:#fff;">Browser:</strong> Chrome, Edge, Brave, or Opera with hardware acceleration enabled (WebGPU + SharedArrayBuffer).
+            </p>
+            <p style="margin:0 0 10px; font-size:13px; color:#c8d9ea;">
+              <strong style="color:#fff;">GameData Folder:</strong> Select your Steam, GOG, or Disc <code>GameData</code> folder once — your browser remembers it for instant 1-click reconnects.
+            </p>
+            <p style="margin:0 0 16px; font-size:13px; color:#c8d9ea;">
+              <strong style="color:#fff;">Networking:</strong> Direct peer-to-peer WebRTC DataChannels for low ping, with automatic WebSocket relay fallback behind strict NATs.
+            </p>
+            <a href="/play" class="bf-btn primary" style="width:100%;">Open Holonet Game Portal →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Community -->
+  <section id="comms" class="block">
+    <div class="container">
+      <div class="bf-panel">
+        <div class="bf-panel-head">
+          <span>GALACTIC COMMUNITY</span>
+          <span class="code-tag">OPEN SOURCE · NON-COMMERCIAL</span>
+        </div>
+        <div class="bf-panel-body comms-strip">
+          <div class="comms-copy">
+            <h3>Join the Battlefront II Community</h3>
+            <p>
+              Organize XL Nights &amp; Hero Assault matches in our Discord, share lobby invite links,
+              or explore and contribute to the open-source browser port on GitHub.
+            </p>
+          </div>
+          <div class="comms-actions">
+            <a id="discordBtn" href="#" target="_blank" rel="noopener noreferrer" class="bf-btn primary" style="display:none;">Join Discord</a>
+            <a id="githubBtn" href="#" target="_blank" rel="noopener noreferrer" class="bf-btn" style="display:none;">GitHub Repo</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="block">
+    <div class="container">
+      <div class="sec-banner">
+        <h2>Field Manual // FAQ</h2>
+        <span class="sec-sub">Common Questions</span>
+      </div>
+      <div class="faq-grid">
+        <div class="bf-panel faq-card">
+          <div class="bf-panel-body">
+            <h4>Do I need to own Star Wars Battlefront II (2005)?</h4>
+            <p>Yes — this is a <b>Bring-Your-Own-Copy</b> browser engine. Point the portal at your legal <a href="https://store.steampowered.com/app/6060/STAR_WARS_Battlefront_II_Classic_2005/" target="_blank" rel="noopener noreferrer" style="color:var(--holo); text-decoration:underline;">Steam</a>, <a href="https://www.gog.com/en/game/star_wars_battlefront_ii" target="_blank" rel="noopener noreferrer" style="color:var(--holo); text-decoration:underline;">GOG</a>, or Disc <code>GameData</code> folder; your files remain 100% on your device and are never uploaded.</p>
+          </div>
+        </div>
+        <div class="bf-panel faq-card">
+          <div class="bf-panel-body">
+            <h4>Can friends join a match already in progress?</h4>
+            <p>Yes. Live matches remain listed as <b>In Match · Joinable</b> in the lobby browser, and sharing your Invite Link lets friends hot-join straight onto the battlefield.</p>
+          </div>
+        </div>
+        <div class="bf-panel faq-card">
+          <div class="bf-panel-body">
+            <h4>How do text chat, voice chat, and fullscreen pause work?</h4>
+            <p>Press <b>T</b> for All Chat, <b>Y</b> for Team Chat, and hold <b>V</b> for Push-to-Talk voice. Tapping <b>Esc</b> pauses the game in fullscreen so you can respawn or change teams cleanly.</p>
+          </div>
+        </div>
+        <div class="bf-panel faq-card">
+          <div class="bf-panel-body">
+            <h4>Are Space Battles, XL Mode, and Save Imports included?</h4>
+            <p>Yes — all 24 maps (including Hoth XL, Geonosis XL, Kashyyyk XL, Hero Assault, Hunt, CTF, and all 6 Space Assault arenas) work solo or online, with full save export &amp; import.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-row">
+      <div><strong style="color:#eef6ff; letter-spacing:0.08em; text-transform:uppercase;">SWBF2O // Battlefront II Browser Edition</strong></div>
+      <div class="foot-links">
+        <a href="/play">Play Game</a>
+        <a href="/play#lobbies">Lobbies</a>
+        <a id="footDiscordLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">Discord</a>
+        <a id="footGithubLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">GitHub</a>
+      </div>
+    </div>
+    <p class="disclaimer">
+      Independent, non-commercial community preservation project. Players must supply their own legal copy of Star Wars Battlefront II (2005). Star Wars and Star Wars Battlefront II are trademarks of Lucasfilm Ltd. / Disney and Pandemic Studios. No affiliation or endorsement is implied.
+    </p>
+  </div>
+</footer>
+
+<script type="module">
+  import { SITE_CONFIG } from '/browser/site_config.mjs';
+
+  if (SITE_CONFIG.discordUrl) {
+    for (const [id, disp] of [['navDiscordBtn', 'inline-flex'], ['heroDiscordBtn', 'inline-flex'], ['discordBtn', 'inline-flex'], ['footDiscordLink', 'inline']]) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.href = SITE_CONFIG.discordUrl;
+        el.style.display = disp;
+      }
+    }
+  }
+  if (SITE_CONFIG.githubUrl) {
+    for (const [id, disp] of [['navGithubBtn', 'inline-flex'], ['heroGithubBtn', 'inline-flex'], ['githubBtn', 'inline-flex'], ['footGithubLink', 'inline']]) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.href = SITE_CONFIG.githubUrl;
+        el.style.display = disp;
+      }
+    }
+  }
+
+  async function refreshLiveStats() {
+    try {
+      const res = await fetch('/api/rooms', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      const rooms = data.rooms || [];
+      const players = rooms.reduce((sum, r) => sum + (Number(r.players) || 0), 0);
+      document.getElementById('navOnlineCount').textContent = `${players} ONLINE`;
+      document.getElementById('statPlayers').textContent = String(players);
+      document.getElementById('statRooms').textContent = String(rooms.length);
+    } catch {}
+  }
+  refreshLiveStats();
+  setInterval(refreshLiveStats, 8000);
+</script>
+</body>
+</html>

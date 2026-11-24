@@ -1,0 +1,962 @@
+[
+ {
+  "path": "fpm/rep/repatxtp.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repmedic.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/allxwing.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/repgunnr.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cismttp.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/allxwing.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/com/comgunnr.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allhvrnt.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/repgunnr.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allkwing.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "load/shell.lvl",
+  "size": 8,
+  "kind": "container"
+ },
+ {
+  "path": "load/load.lvl",
+  "size": 24488,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/repgunnr.lvl",
+  "size": 37160,
+  "kind": "container"
+ },
+ {
+  "path": "sound/common.bnk;sample_2eb95650",
+  "kind": "sound",
+  "size": 96844,
+  "url": "/build/class_data/sound/common/sample_2eb95650.lvl",
+  "fsPath": "/data/sound_common.bnk",
+  "sourceSize": 77942784
+ },
+ {
+  "path": "fpm/cis/cissbdrd.lvl",
+  "size": 194740,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/alltaun.lvl",
+  "size": 229080,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/com/comgntrt.lvl",
+  "size": 300996,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/alleng.lvl",
+  "size": 375552,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allbothn.lvl",
+  "size": 375892,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impstrp.lvl",
+  "size": 378076,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allleia.lvl",
+  "size": 383708,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cisfett.lvl",
+  "size": 386040,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allhstat.lvl",
+  "size": 397180,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repfelsn.lvl",
+  "size": 422612,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cisoff.lvl",
+  "size": 428872,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repcomm.lvl",
+  "size": 435804,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impboba.lvl",
+  "size": 451652,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/imppilot.lvl",
+  "size": 484984,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impscout.lvl",
+  "size": 485072,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allmedic.lvl",
+  "size": 485344,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allpilot.lvl",
+  "size": 485416,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allmarks.lvl",
+  "size": 485584,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allhstrm.lvl",
+  "size": 488356,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/alllstat.lvl",
+  "size": 488356,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/alllstrm.lvl",
+  "size": 488356,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/alltroop.lvl",
+  "size": 489740,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allhthmk.lvl",
+  "size": 490116,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/reppilot.lvl",
+  "size": 490324,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/reparc.lvl",
+  "size": 490332,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/reptroop.lvl",
+  "size": 490344,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repsharp.lvl",
+  "size": 490424,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repjettp.lvl",
+  "size": 490916,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allhthtr.lvl",
+  "size": 492972,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impsntr.lvl",
+  "size": 502456,
+  "kind": "container"
+ },
+ {
+  "path": "load/gal_con.lvl",
+  "size": 524424,
+  "kind": "container"
+ },
+ {
+  "path": "load/common.lvl",
+  "size": 524428,
+  "kind": "container"
+ },
+ {
+  "path": "load/cam_p1.lvl",
+  "size": 524432,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cisbdrd.lvl",
+  "size": 537128,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allwook.lvl",
+  "size": 653584,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cisspdrw.lvl",
+  "size": 674520,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impftrtk.lvl",
+  "size": 681796,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cisstapp.lvl",
+  "size": 682568,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cismafp.lvl",
+  "size": 682940,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repspbk.lvl",
+  "size": 690056,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repgunnr.lvl",
+  "size": 692716,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/rephtrop.lvl",
+  "size": 692744,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impspbk.lvl",
+  "size": 704308,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repftrtk.lvl",
+  "size": 750744,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impdark.lvl",
+  "size": 904144,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/com/comallre.lvl",
+  "size": 992132,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/com/comcisim.lvl",
+  "size": 993572,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/com/comunive.lvl",
+  "size": 994780,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/imptibmr.lvl",
+  "size": 1018464,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/imptiftr.lvl",
+  "size": 1020404,
+  "kind": "container"
+ },
+ {
+  "path": "load/end1.lvl",
+  "size": 1048840,
+  "kind": "container"
+ },
+ {
+  "path": "load/cam_p2.lvl",
+  "size": 1048856,
+  "kind": "container"
+ },
+ {
+  "path": "mission.lvl",
+  "size": 1253844,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cisdrde.lvl",
+  "size": 1314104,
+  "kind": "container"
+ },
+ {
+  "path": "load/tat3.lvl",
+  "size": 1573256,
+  "kind": "container"
+ },
+ {
+  "path": "load/yav1.lvl",
+  "size": 1573256,
+  "kind": "container"
+ },
+ {
+  "path": "load/dag1.lvl",
+  "size": 1573256,
+  "kind": "container"
+ },
+ {
+  "path": "load/dea1.lvl",
+  "size": 1573256,
+  "kind": "container"
+ },
+ {
+  "path": "side/ewk.lvl",
+  "size": 1612544,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allsccam.lvl",
+  "size": 1842848,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impsccam.lvl",
+  "size": 1860652,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repsccam.lvl",
+  "size": 1861036,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/atst.lvl",
+  "size": 1879032,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impatstg.lvl",
+  "size": 1880648,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allcmspg.lvl",
+  "size": 1893268,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/com/comviewf.lvl",
+  "size": 1908596,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/com/comhview.lvl",
+  "size": 1908616,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cisstrft.lvl",
+  "size": 1915544,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cissccam.lvl",
+  "size": 1922280,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cishlfrd.lvl",
+  "size": 1922804,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/gunsspdr.lvl",
+  "size": 1926224,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impimplc.lvl",
+  "size": 1930916,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allsspdr.lvl",
+  "size": 1936552,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impatat.lvl",
+  "size": 1939232,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repcmspd.lvl",
+  "size": 1939588,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allcldcr.lvl",
+  "size": 1940220,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allcmspd.lvl",
+  "size": 1941544,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repjedfi.lvl",
+  "size": 1943524,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impatatg.lvl",
+  "size": 1944708,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repguntr.lvl",
+  "size": 1946540,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repatted.lvl",
+  "size": 1952216,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allxwing.lvl",
+  "size": 1953236,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/all/allywing.lvl",
+  "size": 1955272,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/rep/repgunsh.lvl",
+  "size": 1955600,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/imp/impoff.lvl",
+  "size": 2036076,
+  "kind": "container"
+ },
+ {
+  "path": "load/cor1.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/myg1.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/mus1.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/fel1.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/tat2.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/pol1.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/uta1.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/kam1.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/hot1.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/kas2.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/nab2.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "load/tan1.lvl",
+  "size": 2097672,
+  "kind": "container"
+ },
+ {
+  "path": "inshell.lvl",
+  "size": 2196996,
+  "kind": "container"
+ },
+ {
+  "path": "side/des.lvl",
+  "size": 2443512,
+  "kind": "container"
+ },
+ {
+  "path": "fpm/cis/cisaatp.lvl",
+  "size": 2573920,
+  "kind": "container"
+ },
+ {
+  "path": "load/geo1.lvl",
+  "size": 2622088,
+  "kind": "container"
+ },
+ {
+  "path": "common.lvl",
+  "size": 2900528,
+  "kind": "container"
+ },
+ {
+  "path": "side/imp.lvl;imp_inf_rifleman",
+  "classFile": "side/imp.lvl;imp_inf_rifleman",
+  "kind": "class",
+  "size": 3406400,
+  "url": "/build/class_data/side/imp/imp_inf_rifleman.lvl",
+  "fsPath": "/data/side_imp.lvl",
+  "sourceSize": 100463052
+ },
+ {
+  "path": "side/rep.lvl;rep_inf_ep3_rifleman",
+  "classFile": "side/rep.lvl;rep_inf_ep3_rifleman",
+  "kind": "class",
+  "size": 3461796,
+  "url": "/build/class_data/side/rep/rep_inf_ep3_rifleman.lvl",
+  "fsPath": "/data/side_rep.lvl",
+  "sourceSize": 147884048
+ },
+ {
+  "path": "side/gun.lvl",
+  "size": 3927216,
+  "kind": "container"
+ },
+ {
+  "path": "side/snw.lvl",
+  "size": 4449012,
+  "kind": "container"
+ },
+ {
+  "path": "side/cis.lvl;cis_inf_rifleman",
+  "classFile": "side/cis.lvl;cis_inf_rifleman",
+  "kind": "class",
+  "size": 4981024,
+  "url": "/build/class_data/side/cis/cis_inf_rifleman.lvl",
+  "fsPath": "/data/side_cis.lvl",
+  "sourceSize": 101132344
+ },
+ {
+  "path": "sound/pol.lvl",
+  "size": 5151112,
+  "kind": "container"
+ },
+ {
+  "path": "side/gam.lvl",
+  "size": 5423404,
+  "kind": "container"
+ },
+ {
+  "path": "side/wok.lvl",
+  "size": 5670056,
+  "kind": "container"
+ },
+ {
+  "path": "side/gar.lvl",
+  "size": 5711160,
+  "kind": "container"
+ },
+ {
+  "path": "side/geo.lvl",
+  "size": 6356580,
+  "kind": "container"
+ },
+ {
+  "path": "load/spa.lvl",
+  "size": 6817416,
+  "kind": "container"
+ },
+ {
+  "path": "core.lvl",
+  "size": 7164480,
+  "kind": "container"
+ },
+ {
+  "path": "sound/myg.lvl",
+  "size": 8412952,
+  "kind": "container"
+ },
+ {
+  "path": "sound/fel.lvl",
+  "size": 10413600,
+  "kind": "container"
+ },
+ {
+  "path": "sound/nab.lvl",
+  "size": 10682020,
+  "kind": "container"
+ },
+ {
+  "path": "sound/dag.lvl",
+  "size": 11863988,
+  "kind": "container"
+ },
+ {
+  "path": "side/repshell.lvl",
+  "size": 12224968,
+  "kind": "container"
+ },
+ {
+  "path": "side/impshell.lvl",
+  "size": 13317456,
+  "kind": "container"
+ },
+ {
+  "path": "side/cisshell.lvl",
+  "size": 13763556,
+  "kind": "container"
+ },
+ {
+  "path": "sound/geo.lvl",
+  "size": 14715128,
+  "kind": "container"
+ },
+ {
+  "path": "ingame.lvl",
+  "size": 15041976,
+  "kind": "container"
+ },
+ {
+  "path": "sound/mus.lvl",
+  "size": 16875084,
+  "kind": "container"
+ },
+ {
+  "path": "dag/dag1.lvl",
+  "size": 17218208,
+  "kind": "container"
+ },
+ {
+  "path": "sound/uta.lvl",
+  "size": 19165364,
+  "kind": "container"
+ },
+ {
+  "path": "geo/geo1.lvl",
+  "size": 19670080,
+  "kind": "container"
+ },
+ {
+  "path": "nab/nab2.lvl",
+  "size": 19705088,
+  "kind": "container"
+ },
+ {
+  "path": "shell.lvl",
+  "size": 20737804,
+  "kind": "container"
+ },
+ {
+  "path": "sound/kas.lvl",
+  "size": 21094724,
+  "kind": "container"
+ },
+ {
+  "path": "kam/kam1.lvl",
+  "size": 22665940,
+  "kind": "container"
+ },
+ {
+  "path": "kas/kas2.lvl",
+  "size": 23391112,
+  "kind": "container"
+ },
+ {
+  "path": "side/allshell.lvl",
+  "size": 23750492,
+  "kind": "container"
+ },
+ {
+  "path": "hot/hot1.lvl",
+  "size": 25483368,
+  "kind": "container"
+ },
+ {
+  "path": "sound/end.lvl",
+  "size": 25884616,
+  "kind": "container"
+ },
+ {
+  "path": "sound/kam.lvl",
+  "size": 25988784,
+  "kind": "container"
+ },
+ {
+  "path": "tat/tat2.lvl",
+  "size": 26279448,
+  "kind": "container"
+ },
+ {
+  "path": "myg/myg1.lvl",
+  "size": 27648432,
+  "kind": "container"
+ },
+ {
+  "path": "sound/tan.lvl",
+  "size": 27686688,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa5.lvl",
+  "size": 28499452,
+  "kind": "container"
+ },
+ {
+  "path": "side/jed.lvl",
+  "size": 30211364,
+  "kind": "container"
+ },
+ {
+  "path": "mus/mus1.lvl",
+  "size": 30922360,
+  "kind": "container"
+ },
+ {
+  "path": "yav/yav1.lvl",
+  "size": 32154356,
+  "kind": "container"
+ },
+ {
+  "path": "fel/fel1.lvl",
+  "size": 33098708,
+  "kind": "container"
+ },
+ {
+  "path": "side/tur.lvl",
+  "size": 34871216,
+  "kind": "container"
+ },
+ {
+  "path": "tan/tan1.lvl",
+  "size": 34875984,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa4.lvl",
+  "size": 35080872,
+  "kind": "container"
+ },
+ {
+  "path": "sound/yav.lvl",
+  "size": 36196348,
+  "kind": "container"
+ },
+ {
+  "path": "end/end1.lvl",
+  "size": 36718664,
+  "kind": "container"
+ },
+ {
+  "path": "pol/pol1.lvl",
+  "size": 38153676,
+  "kind": "container"
+ },
+ {
+  "path": "sound/tat.lvl",
+  "size": 39147876,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa8.lvl",
+  "size": 41870780,
+  "kind": "container"
+ },
+ {
+  "path": "dea/dea1.lvl",
+  "size": 42388880,
+  "kind": "container"
+ },
+ {
+  "path": "sound/gal.lvl",
+  "size": 42978960,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa9.lvl",
+  "size": 43204876,
+  "kind": "container"
+ },
+ {
+  "path": "sound/shell.lvl",
+  "size": 43705348,
+  "kind": "container"
+ },
+ {
+  "path": "uta/uta1.lvl",
+  "size": 43924780,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa2.lvl",
+  "size": 44679548,
+  "kind": "container"
+ },
+ {
+  "path": "sound/hot.lvl",
+  "size": 45580160,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa_sky.lvl",
+  "size": 45642088,
+  "kind": "container"
+ },
+ {
+  "path": "gal/gal1.lvl",
+  "size": 45862892,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa6.lvl",
+  "size": 48260464,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa7.lvl",
+  "size": 48423312,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa1.lvl",
+  "size": 51387068,
+  "kind": "container"
+ },
+ {
+  "path": "tat/tat3.lvl",
+  "size": 51562244,
+  "kind": "container"
+ },
+ {
+  "path": "sound/cor.lvl",
+  "size": 56500740,
+  "kind": "container"
+ },
+ {
+  "path": "sound/dea.lvl",
+  "size": 57635192,
+  "kind": "container"
+ },
+ {
+  "path": "spa/spa3.lvl",
+  "size": 58626472,
+  "kind": "container"
+ },
+ {
+  "path": "cor/cor1.lvl",
+  "size": 59945832,
+  "kind": "container"
+ },
+ {
+  "path": "sound/spa.lvl",
+  "size": 83219496,
+  "kind": "container"
+ },
+ {
+  "path": "side/imp.lvl",
+  "size": 100463052,
+  "kind": "container"
+ },
+ {
+  "path": "side/cis.lvl",
+  "size": 101132344,
+  "kind": "container"
+ },
+ {
+  "path": "side/rep.lvl",
+  "size": 147884048,
+  "kind": "container"
+ },
+ {
+  "path": "side/all.lvl",
+  "size": 182901004,
+  "kind": "container"
+ },
+ {
+  "path": "sound/global.lvl",
+  "size": 739225600,
+  "kind": "container"
+ }
+]

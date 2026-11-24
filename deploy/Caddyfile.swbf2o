@@ -1,0 +1,10 @@
+# Optional Caddy config if you expose swbf2o.com directly via port-forwarded 80/443
+# instead of Cloudflare Tunnel. Append to /etc/caddy/Caddyfile and `sudo systemctl reload caddy`.
+
+swbf2o.com, www.swbf2o.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8123 {
+        header_up X-Forwarded-Proto {scheme}
+        flush_interval -1
+    }
+}
